@@ -1,6 +1,6 @@
 {
   "name": "kickpress",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "A fast and opinionated CLI for scaffolding Express.js projects with TypeScript, Prisma, and best practices built-in",
   "main": "dist/index.js",
   "type": "module",
