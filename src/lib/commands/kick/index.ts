@@ -150,6 +150,7 @@ export const registerFreshCommand = (program: Command): void => {
         });
 
         console.log(chalk.green("\n✅ Database initialized!\n"));
+
         console.log(chalk.green(`\n✅ Project created successfully!\n`));
 
         console.log(chalk.cyan("Next steps:"));

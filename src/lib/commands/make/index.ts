@@ -146,31 +146,6 @@ export const registerInventCommand = (program: Command): void => {
         console.log(chalk.green("\n✅ Resources generated successfully!\n"));
 
         if (generateAll || type === "model") {
-          console.log(chalk.cyan("⚠️  Next steps:"));
-          console.log(
-            chalk.gray(
-              `  1. Add fields to ${entityCapitalized} model in prisma/schema.prisma`
-            )
-          );
-          console.log(
-            chalk.gray(
-              `  2. Run: ${
-                projectConfig.packageManager === "npm"
-                  ? `${projectConfig.packageManager} run db:generate`
-                  : `${projectConfig.packageManager} db:generate`
-              }`
-            )
-          );
-          console.log(
-            chalk.gray(
-              `  3. Run: ${
-                projectConfig.packageManager === "npm"
-                  ? `${projectConfig.packageManager} run db:push`
-                  : `${projectConfig.packageManager} db:push`
-              }`
-            )
-          );
-
           console.log(chalk.blue("\n📦 Running Prisma generate...\n"));
 
           execSync(
@@ -200,6 +175,31 @@ export const registerInventCommand = (program: Command): void => {
 
           console.log(chalk.green("\n✅ Database updated successfully!\n"));
         }
+
+        console.log(chalk.cyan("⚠️  Next steps:"));
+        console.log(
+          chalk.gray(
+            `  1. Add fields to ${entityCapitalized} model in prisma/schema.prisma`
+          )
+        );
+        console.log(
+          chalk.gray(
+            `  2. Run: ${
+              projectConfig.packageManager === "npm"
+                ? `${projectConfig.packageManager} run db:generate`
+                : `${projectConfig.packageManager} db:generate`
+            }`
+          )
+        );
+        console.log(
+          chalk.gray(
+            `  3. Run: ${
+              projectConfig.packageManager === "npm"
+                ? `${projectConfig.packageManager} run db:push`
+                : `${projectConfig.packageManager} db:push`
+            }`
+          )
+        );
       } catch (error) {
         console.error(
           chalk.red(
