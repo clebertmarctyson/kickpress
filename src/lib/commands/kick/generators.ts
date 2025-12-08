@@ -312,53 +312,211 @@ export const generateReadme = (
   packageManager: string
 ): string => {
   const pm = packageManager;
+  const runCmd = pm === "npm" ? "npm run" : pm;
 
   return `# ${projectName}
 
-Created with Kickpress CLI
+Created with [Kickpress CLI](https://github.com/clebertmarctyson/kickpress) ☕
 
-## Getting Started
+A production-ready Express.js API with TypeScript, Prisma ORM, and best practices built-in.
 
-### 1. Install dependencies
+## 🚀 Getting Started
+
+${
+  pm === "pnpm"
+    ? `### ⚠️ Important: Approve Native Builds (pnpm only)
+
+Before running the project, you need to approve native dependencies:
+
+\`\`\`bash
+pnpm approve-builds
+# Select: better-sqlite3 (press space, then enter)
+\`\`\`
+
+This is a one-time setup required by pnpm for native dependencies.
+
+---
+
+`
+    : ""
+}### 1. Install Dependencies
+
+${
+  pm === "pnpm"
+    ? "Dependencies should already be installed. If not, run:"
+    : "Install all project dependencies:"
+}
+
 \`\`\`bash
 ${pm} install
 \`\`\`
 
 ### 2. Setup Database
+
 \`\`\`bash
 # Generate Prisma Client
-${pm} run db:generate
+${runCmd} db:generate
 
 # Push schema to database
-${pm} run db:push
+${runCmd} db:push
 \`\`\`
 
-### 3. Run development server
+### 3. Start Development Server
+
 \`\`\`bash
-${pm} run dev
+${runCmd} dev
 \`\`\`
 
-## Available Commands
+Your API is now running at \`http://localhost:3000\`! 🎉
 
-- \`${pm} run dev\` - Start development server with hot reload
-${typescript ? `- \`${pm} run build\` - Build for production` : ""}
-- \`${pm} start\` - Start production server
-- \`${pm} run db:generate\` - Generate Prisma Client
-- \`${pm} run db:push\` - Push schema changes to database
-- \`${pm} run db:migrate\` - Create migration
-- \`${pm} run db:studio\` - Open Prisma Studio
+## 📋 Available Commands
 
-## Generate Resources
+### Development
+- \`${runCmd} dev\` - Start development server with hot reload
+
+${
+  typescript
+    ? `### Build
+- \`${runCmd} build\` - Compile TypeScript to JavaScript
+- \`${runCmd} start\` - Start production server
+
+`
+    : `### Production
+- \`${runCmd} start\` - Start production server
+
+`
+}### Database Management
+- \`${runCmd} db:generate\` - Generate Prisma Client
+- \`${runCmd} db:push\` - Push schema changes to database
+- \`${runCmd} db:migrate\` - Create a new migration
+- \`${runCmd} db:studio\` - Open Prisma Studio (database GUI)
+
+## 🎯 Generate Resources
+
+Kickpress can generate complete CRUD resources for any entity:
 
 \`\`\`bash
-# Generate full CRUD for an entity
+# Generate everything (routes, controller, model, types, HTTP requests)
 npx kickpress make user resources
+npx kickpress gen post resources     # Short alias
 
-# Or individual parts
+# Generate individual components
 npx kickpress make user model
 npx kickpress make user controller
 npx kickpress make user routes
 \`\`\`
+
+**Available aliases:**
+- \`make\` / \`m\` / \`gen\` / \`g\` / \`generate\`
+
+## 📁 Project Structure
+
+\`\`\`
+${projectName}/
+├── src/
+│   ├── index.${typescript ? "ts" : "js"}           # Main entry point
+│   ├── lib/
+│   │   └── prisma.${typescript ? "ts" : "js"}      # Prisma client
+│   ├── controllers/                  # Request handlers
+│   ├── models/                       # Database operations
+│   ├── routes/                       # Express routes
+${
+  typescript ? "│   ├── types/                        # TypeScript types\n" : ""
+}│   ├── middlewares/
+│   │   └── error.middleware.${typescript ? "ts" : "js"}
+│   ├── config/                       # Configuration
+│   └── utils/                        # Utilities
+├── prisma/
+│   ├── schema.prisma                 # Database schema
+│   └── migrations/                   # Database migrations
+├── requests/                         # HTTP test files
+├── .env                              # Environment variables
+${
+  typescript
+    ? "├── tsconfig.json                     # TypeScript config\n"
+    : ""
+}└── package.json
+\`\`\`
+
+## 🧪 Testing Your API
+
+Each generated resource includes an \`.http\` file for testing. Use [REST Client](https://marketplace.visualstudio.com/items?itemName=humao.rest-client) extension in VS Code:
+
+1. Open \`requests/user.http\`
+2. Click "Send Request" above any request
+3. View response in VS Code
+
+Or use curl:
+
+\`\`\`bash
+# Get all users
+curl http://localhost:3000/users
+
+# Create a user
+curl -X POST http://localhost:3000/users \\
+  -H "Content-Type: application/json" \\
+  -d '{"name":"John Doe","email":"john@example.com"}'
+\`\`\`
+
+## 📝 Environment Variables
+
+Edit \`.env\` to configure your application:
+
+\`\`\`env
+PORT=3000
+NODE_ENV=development
+DATABASE_URL="file:./dev.db"
+\`\`\`
+
+## 🛠️ Technology Stack
+
+- **Express.js** - Fast, minimalist web framework
+${typescript ? "- **TypeScript** - Type-safe JavaScript\n" : ""}${
+    typescript ? "- **tsx** - TypeScript execution engine\n" : ""
+  }- **Prisma** - Next-generation ORM
+- **SQLite** - Default database (easily swappable)
+- **express-async-handler** - Async error handling
+
+## 📚 Learn More
+
+- [Kickpress Documentation](https://github.com/clebertmarctyson/kickpress#readme)
+- [Express.js Docs](https://expressjs.com/)
+- [Prisma Docs](https://www.prisma.io/docs)
+${typescript ? "- [TypeScript Docs](https://www.typescriptlang.org/)\n" : ""}
+## 🐛 Troubleshooting
+
+### Port already in use
+Change the port in \`.env\`:
+\`\`\`env
+PORT=3001
+\`\`\`
+
+### Prisma Client errors
+Regenerate the Prisma client:
+\`\`\`bash
+${runCmd} db:generate
+\`\`\`
+${
+  pm === "pnpm"
+    ? `
+### Module not found errors (pnpm)
+Make sure you've approved native builds:
+\`\`\`bash
+pnpm approve-builds
+# Select: better-sqlite3
+\`\`\`
+`
+    : ""
+}
+## 💬 Support
+
+- 🐛 [Report Issues](https://github.com/clebertmarctyson/kickpress/issues)
+- 💡 [Request Features](https://github.com/clebertmarctyson/kickpress/issues/new)
+- 📧 Email: contact@marctysonclebert.com
+
+---
+
+Made with ☕ and ❤️ by [Marc Tyson CLEBERT](https://www.marctysonclebert.com)
 `;
 };
 
