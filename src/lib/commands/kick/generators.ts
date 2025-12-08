@@ -16,6 +16,7 @@ export const createProjectStructure = (projectPath: string): void => {
     "src/controllers",
     "src/models",
     "src/routes",
+    "src/validations",
     "src/middlewares",
     "src/config",
     "src/utils",
@@ -40,7 +41,7 @@ export const generatePackageJson = (config: ProjectConfig): object => {
     "@prisma/client": "^7.1.0",
     "@prisma/adapter-better-sqlite3": "^7.1.0",
     "better-sqlite3": "^12.5.0",
-    dotenv: "^17.2.3",
+    zod: "^4.1.13",
   };
 
   const devDependencies: Record<string, string> = {
@@ -48,6 +49,7 @@ export const generatePackageJson = (config: ProjectConfig): object => {
     "@types/express": "^4.17.21",
     "@types/better-sqlite3": "^7.6.13",
     prisma: "^7.1.0",
+    dotenv: "^17.2.3",
   };
 
   // Add TypeScript dependencies

@@ -6,17 +6,20 @@ import { getWorkingDirectory } from "@/lib/utils/paths.js";
 import { detectProjectConfig } from "@/lib/commands/make/detect.js";
 import { generateRoutes } from "@/lib/commands/make/generators/routes.js";
 import { generateController } from "@/lib/commands/make/generators/controller.js";
+import { generateValidations } from "./generators/validation.js";
 import { generateModel } from "@/lib/commands/make/generators/model.js";
 import { generateTypes } from "@/lib/commands/make/generators/types.js";
 import { generateHttpRequests } from "@/lib/commands/make/generators/http.js";
 import { updatePrismaSchema } from "@/lib/commands/make/generators/schema.js";
 import { injectRouteIntoIndex } from "@/lib/commands/make/injectors/index-injector.js";
+import { capitalizeFirst } from "@/lib/utils/index.js";
 
-type ResourceType = "routes" | "controller" | "model" | "resources";
-
-const capitalizeFirst = (str: string): string => {
-  return str.charAt(0).toUpperCase() + str.slice(1);
-};
+type ResourceType =
+  | "routes"
+  | "controller"
+  | "model"
+  | "resources"
+  | "validation";
 
 export const registerInventCommand = (program: Command): void => {
   program
@@ -117,6 +120,11 @@ export const registerInventCommand = (program: Command): void => {
           );
         }
 
+        if (generateAll || type === "validation") {
+          console.log(chalk.gray("📝 Creating validations..."));
+          await generateValidations(workingDir, entity, projectConfig);
+        }
+
         if (generateAll || type === "routes") {
           console.log(chalk.gray("📝 Creating routes..."));
           await generateRoutes(workingDir, entity, projectConfig);
@@ -163,38 +171,34 @@ export const registerInventCommand = (program: Command): void => {
             )
           );
 
-          // Ask if they want to run Prisma commands automatically
-          const shouldRunPrisma = true;
+          console.log(chalk.blue("\n📦 Running Prisma generate...\n"));
 
-          if (shouldRunPrisma) {
-            console.log(chalk.blue("\n📦 Running Prisma generate...\n"));
-            execSync(
-              `${
-                projectConfig.packageManager === "npm"
-                  ? `${projectConfig.packageManager} run db:generate`
-                  : `${projectConfig.packageManager} db:generate`
-              }`,
-              {
-                cwd: workingDir,
-                stdio: "inherit",
-              }
-            );
+          execSync(
+            `${
+              projectConfig.packageManager === "npm"
+                ? `${projectConfig.packageManager} run db:generate`
+                : `${projectConfig.packageManager} db:generate`
+            }`,
+            {
+              cwd: workingDir,
+              stdio: "inherit",
+            }
+          );
 
-            console.log(chalk.blue("\n📦 Running Prisma push...\n"));
-            execSync(
-              `${
-                projectConfig.packageManager === "npm"
-                  ? `${projectConfig.packageManager} run db:push`
-                  : `${projectConfig.packageManager} db:push`
-              }`,
-              {
-                cwd: workingDir,
-                stdio: "inherit",
-              }
-            );
+          console.log(chalk.blue("\n📦 Running Prisma push...\n"));
+          execSync(
+            `${
+              projectConfig.packageManager === "npm"
+                ? `${projectConfig.packageManager} run db:push`
+                : `${projectConfig.packageManager} db:push`
+            }`,
+            {
+              cwd: workingDir,
+              stdio: "inherit",
+            }
+          );
 
-            console.log(chalk.green("\n✅ Database updated successfully!\n"));
-          }
+          console.log(chalk.green("\n✅ Database updated successfully!\n"));
         }
       } catch (error) {
         console.error(

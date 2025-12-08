@@ -22,7 +22,13 @@ export const generateRoutes = async (
   writeFileSync(routeFile, content);
 };
 
+const capitalizeFirst = (str: string): string => {
+  return str.charAt(0).toUpperCase() + str.slice(1);
+};
+
 const generateTypeScriptRoutes = (entity: string): string => {
+  const entityCapitalized = capitalizeFirst(entity);
+
   return `import { Router } from "express";
 import {
   all,
@@ -31,18 +37,30 @@ import {
   update,
   remove,
 } from "../controllers/${entity}.controller";
+import {
+  validate${entityCapitalized}Create,
+  validate${entityCapitalized}Update,
+  validate${entityCapitalized}Id,
+} from "../validations/${entity}.validation";
 
 const router = Router();
 
-router.route("/").get(all).post(create);
+router.route("/")
+  .get(all)
+  .post(validate${entityCapitalized}Create, create);
 
-router.route("/:id").get(findOne).patch(update).delete(remove);
+router.route("/:id")
+  .get(validate${entityCapitalized}Id, findOne)
+  .patch(validate${entityCapitalized}Id, validate${entityCapitalized}Update, update)
+  .delete(validate${entityCapitalized}Id, remove);
 
 export default router;
 `;
 };
 
 const generateJavaScriptRoutes = (entity: string): string => {
+  const entityCapitalized = capitalizeFirst(entity);
+
   return `import { Router } from "express";
 import {
   all,
@@ -51,12 +69,22 @@ import {
   update,
   remove,
 } from "../controllers/${entity}.controller.js";
+import {
+  validate${entityCapitalized}Create,
+  validate${entityCapitalized}Update,
+  validate${entityCapitalized}Id,
+} from "../validations/${entity}.validation.js";
 
 const router = Router();
 
-router.route("/").get(all).post(create);
+router.route("/")
+  .get(all)
+  .post(validate${entityCapitalized}Create, create);
 
-router.route("/:id").get(findOne).patch(update).delete(remove);
+router.route("/:id")
+  .get(validate${entityCapitalized}Id, findOne)
+  .patch(validate${entityCapitalized}Id, validate${entityCapitalized}Update, update)
+  .delete(validate${entityCapitalized}Id, remove);
 
 export default router;
 `;

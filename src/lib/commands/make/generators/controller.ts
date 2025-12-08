@@ -68,19 +68,31 @@ const create = asyncHandler(async (req: Request, res: Response) => {
 
 const update = asyncHandler(async (req: Request, res: Response) => {
   const { id } = req.params;
-  const ${entity} = await ${entity}Update(Number(id), req.body);
-  
+
+  const ${entity} = await ${entity}FindOne(Number(id));
+
   if (!${entity}) {
     res.status(404);
     throw new Error("${entityCapitalized} not found");
   }
-  
-  res.json(${entity});
+
+  const updated${entityCapitalized} = await ${entity}Update(${entity}.id, req.body);
+
+  res.json(updated${entityCapitalized});
 });
 
 const remove = asyncHandler(async (req: Request, res: Response) => {
   const { id } = req.params;
-  await ${entity}Delete(Number(id));
+
+  const ${entity} = await ${entity}FindOne(Number(id));
+
+  if (!${entity}) {
+    res.status(404);
+    throw new Error("${entityCapitalized} not found");
+  }
+
+  await ${entity}Delete(${entity}.id);
+
   res.status(204).send();
 });
 
@@ -126,19 +138,31 @@ const create = asyncHandler(async (req, res) => {
 
 const update = asyncHandler(async (req, res) => {
   const { id } = req.params;
-  const ${entity} = await ${entity}Update(Number(id), req.body);
-  
+
+  const ${entity} = await ${entity}FindOne(Number(id));
+
   if (!${entity}) {
     res.status(404);
     throw new Error("${entityCapitalized} not found");
   }
-  
-  res.json(${entity});
+
+  const updated${entityCapitalized} = await ${entity}Update(${entity}.id, req.body);
+
+  res.json(updated${entityCapitalized});
 });
 
 const remove = asyncHandler(async (req, res) => {
   const { id } = req.params;
-  await ${entity}Delete(Number(id));
+
+  const ${entity} = await ${entity}FindOne(Number(id));
+
+  if (!${entity}) {
+    res.status(404);
+    throw new Error("${entityCapitalized} not found");
+  }
+
+  await ${entity}Delete(${entity}.id);
+
   res.status(204).send();
 });
 
