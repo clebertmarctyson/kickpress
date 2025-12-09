@@ -1,14 +1,8 @@
 import { writeFileSync, mkdirSync } from "fs";
 
-import { join } from "path";
+import { Database, ProjectConfig } from "@/lib/types/index.js";
 
-interface ProjectConfig {
-  projectName: string;
-  projectPath: string;
-  typescript: boolean;
-  database: string;
-  template: string;
-}
+import { join } from "path";
 
 export const createProjectStructure = (projectPath: string): void => {
   const folders = [
@@ -38,19 +32,26 @@ export const generatePackageJson = (config: ProjectConfig): object => {
   const dependencies: Record<string, string> = {
     express: "^4.18.2",
     "express-async-handler": "^1.2.0",
-    "@prisma/client": "^7.1.0",
-    "@prisma/adapter-better-sqlite3": "^7.1.0",
-    "better-sqlite3": "^12.5.0",
     zod: "^4.1.13",
   };
 
   const devDependencies: Record<string, string> = {
     "@types/node": "^20.10.6",
     "@types/express": "^4.17.21",
-    "@types/better-sqlite3": "^7.6.13",
-    prisma: "^7.1.0",
-    dotenv: "^17.2.3",
   };
+
+  if (config.database === Database.SQLite) {
+    dependencies["@types/better-sqlite3"] = "^7.6.13";
+    dependencies["better-sqlite3"] = "^12.5.0";
+    dependencies["@prisma/adapter-better-sqlite3"] = "^7.1.0";
+  } else if (config.database === Database.PostgreSQL) {
+    dependencies["@prisma/adapter-pg"] = "^7.1.0";
+  }
+
+  dependencies["@prisma/client"] = "^7.1.0";
+  dependencies.dotenv = "^17.2.3";
+
+  devDependencies.prisma = "^7.1.0";
 
   // Add TypeScript dependencies
   if (typescript) {
@@ -202,42 +203,74 @@ export default errorHandler;
 `;
 };
 
-export const generatePrismaClient = (typescript: boolean): string => {
-  if (typescript) {
-    return `import { PrismaClient } from "./generated/prisma/client";
-import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
+export const generatePrismaClient = (
+  typescript: boolean,
+  database: Database
+): string => {
+  // PostgreSQL
+  if (database === Database.PostgreSQL) {
+    if (typescript) {
+      return `import { PrismaClient } from "./generated/prisma/client";
+  import { PrismaPg } from "@prisma/adapter-pg";
+  
+  const adapter = new PrismaPg({
+    connectionString: process.env.DATABASE_URL!,
+  });
+  
+  const prisma = new PrismaClient({ adapter });
+  
+  export default prisma;
+  `;
+    }
 
-const adapter = new PrismaBetterSqlite3({
-  url: process.env.DATABASE_URL!,
-});
+    return `import { PrismaClient } from "./generated/prisma/index.js";
+  import { PrismaPg } from "@prisma/adapter-pg";
+  
+  const adapter = new PrismaPg({
+    connectionString: process.env.DATABASE_URL,
+  });
+  
+  const prisma = new PrismaClient({ adapter });
+  
+  export default prisma;
+  `;
+  } else {
+    if (typescript) {
+      return `import { PrismaClient } from "./generated/prisma/client";
+import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
+import Database from "better-sqlite3";
+
+const db = new Database(process.env.DATABASE_URL!);
+const adapter = new PrismaBetterSqlite3(db);
+
+const prisma = new PrismaClient({ adapter });
+
+export default prisma;
+`;
+    }
+
+    return `import { PrismaClient } from "./generated/prisma/index.js";
+import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
+import Database from "better-sqlite3";
+
+const db = new Database(process.env.DATABASE_URL);
+const adapter = new PrismaBetterSqlite3(db);
 
 const prisma = new PrismaClient({ adapter });
 
 export default prisma;
 `;
   }
-
-  return `import { PrismaClient } from "./generated/prisma/index.js";
-import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
-
-const adapter = new PrismaBetterSqlite3({
-  url: process.env.DATABASE_URL,
-});
-
-const prisma = new PrismaClient({ adapter });
-
-export default prisma;
-`;
 };
 
-export const generatePrismaSchema = (): string => {
+export const generatePrismaSchema = (provider: string): string => {
   return `generator client {
   provider = "prisma-client"
   output   = "../src/lib/generated/prisma"
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "${provider}"
 }
 
 `;
@@ -289,7 +322,7 @@ export const generateTsConfig = (): string => {
 export const generateEnvFile = (database: string): string => {
   return `PORT=3000
 NODE_ENV=development
-DATABASE_URL="file:./dev.db"
+DATABASE_URL="${database}"
 `;
 };
 
@@ -311,10 +344,67 @@ src/lib/generated/
 export const generateReadme = (
   projectName: string,
   typescript: boolean,
-  packageManager: string
+  packageManager: string,
+  database: Database
 ): string => {
   const pm = packageManager;
   const runCmd = pm === "npm" ? "npm run" : pm;
+
+  const databaseSetupSection =
+    database === "postgresql"
+      ? `### 2. Configure Database
+
+Update your \`.env\` file with your PostgreSQL connection string:
+
+\`\`\`env
+DATABASE_URL="postgresql://USER:PASSWORD@HOST:PORT/DATABASE?schema=public"
+\`\`\`
+
+Example:
+\`\`\`env
+DATABASE_URL="postgresql://postgres:mypassword@localhost:5432/mydb?schema=public"
+\`\`\`
+
+### 3. Setup Database Schema
+
+\`\`\`bash
+# Generate Prisma Client
+${runCmd} db:generate
+
+# Push schema to database
+${runCmd} db:push
+\`\`\`
+
+### 4. Start Development Server`
+      : `### 2. Setup Database
+
+\`\`\`bash
+# Generate Prisma Client
+${runCmd} db:generate
+
+# Push schema to database
+${runCmd} db:push
+\`\`\`
+
+### 3. Start Development Server`;
+
+  const envVarsSection =
+    database === "postgresql"
+      ? `\`\`\`env
+PORT=3000
+NODE_ENV=development
+DATABASE_URL="postgresql://USER:PASSWORD@HOST:PORT/DATABASE?schema=public"
+\`\`\``
+      : `\`\`\`env
+PORT=3000
+NODE_ENV=development
+DATABASE_URL="file:./dev.db"
+\`\`\``;
+
+  const techStackDatabase =
+    database === "postgresql"
+      ? "- **PostgreSQL** - Powerful, open source object-relational database"
+      : "- **SQLite** - Default database (easily swappable)";
 
   return `# ${projectName}
 
@@ -332,7 +422,9 @@ Before running the project, you need to approve native dependencies:
 
 \`\`\`bash
 pnpm approve-builds
-# Select: better-sqlite3 (press space, then enter)
+# Select: ${
+        database === "sqlite" ? "better-sqlite3" : "the required packages"
+      } (press space, then enter)
 \`\`\`
 
 This is a one-time setup required by pnpm for native dependencies.
@@ -353,17 +445,7 @@ ${
 ${pm} install
 \`\`\`
 
-### 2. Setup Database
-
-\`\`\`bash
-# Generate Prisma Client
-${runCmd} db:generate
-
-# Push schema to database
-${runCmd} db:push
-\`\`\`
-
-### 3. Start Development Server
+${databaseSetupSection}
 
 \`\`\`bash
 ${runCmd} dev
@@ -464,11 +546,7 @@ curl -X POST http://localhost:3000/users \\
 
 Edit \`.env\` to configure your application:
 
-\`\`\`env
-PORT=3000
-NODE_ENV=development
-DATABASE_URL="file:./dev.db"
-\`\`\`
+${envVarsSection}
 
 ## 🛠️ Technology Stack
 
@@ -476,7 +554,7 @@ DATABASE_URL="file:./dev.db"
 ${typescript ? "- **TypeScript** - Type-safe JavaScript\n" : ""}${
     typescript ? "- **tsx** - TypeScript execution engine\n" : ""
   }- **Prisma** - Next-generation ORM
-- **SQLite** - Default database (easily swappable)
+${techStackDatabase}
 - **express-async-handler** - Async error handling
 
 ## 📚 Learn More
@@ -484,7 +562,11 @@ ${typescript ? "- **TypeScript** - Type-safe JavaScript\n" : ""}${
 - [Kickpress Documentation](https://github.com/clebertmarctyson/kickpress#readme)
 - [Express.js Docs](https://expressjs.com/)
 - [Prisma Docs](https://www.prisma.io/docs)
-${typescript ? "- [TypeScript Docs](https://www.typescriptlang.org/)\n" : ""}
+${typescript ? "- [TypeScript Docs](https://www.typescriptlang.org/)\n" : ""}${
+    database === "postgresql"
+      ? "- [PostgreSQL Docs](https://www.postgresql.org/docs/)\n"
+      : ""
+  }
 ## 🐛 Troubleshooting
 
 ### Port already in use
@@ -499,17 +581,33 @@ Regenerate the Prisma client:
 ${runCmd} db:generate
 \`\`\`
 ${
-  pm === "pnpm"
+  database === "postgresql"
     ? `
+### Database connection errors
+Make sure:
+1. PostgreSQL is running
+2. DATABASE_URL in \`.env\` is correct
+3. Database exists and is accessible
+4. User has proper permissions
+
+You can test the connection with:
+\`\`\`bash
+psql "${process.env.DATABASE_URL}"
+\`\`\`
+`
+    : ""
+}${
+    pm === "pnpm"
+      ? `
 ### Module not found errors (pnpm)
 Make sure you've approved native builds:
 \`\`\`bash
 pnpm approve-builds
-# Select: better-sqlite3
+# Select: ${database === "sqlite" ? "better-sqlite3" : "required packages"}
 \`\`\`
 `
-    : ""
-}
+      : ""
+  }
 ## 💬 Support
 
 - 🐛 [Report Issues](https://github.com/clebertmarctyson/kickpress/issues)
@@ -527,50 +625,68 @@ export const writeProjectFiles = (
   packageManager: string
 ): void => {
   const { projectPath, projectName, typescript, database } = config;
+  if (
+    config.database === Database.SQLite ||
+    config.database === Database.PostgreSQL
+  ) {
+    // Write package.json
+    writeFileSync(
+      join(projectPath, "package.json"),
+      JSON.stringify(generatePackageJson(config), null, 2)
+    );
 
-  // Write package.json
-  writeFileSync(
-    join(projectPath, "package.json"),
-    JSON.stringify(generatePackageJson(config), null, 2)
-  );
+    // Write main index file
+    const extension = typescript ? "ts" : "js";
+    writeFileSync(
+      join(projectPath, "src", `index.${extension}`),
+      generateIndexFile(typescript)
+    );
 
-  // Write main index file
-  const extension = typescript ? "ts" : "js";
-  writeFileSync(
-    join(projectPath, "src", `index.${extension}`),
-    generateIndexFile(typescript)
-  );
+    // Write error middleware
+    writeFileSync(
+      join(projectPath, "src", "middlewares", `error.middleware.${extension}`),
+      generateErrorMiddleware(typescript)
+    );
 
-  // Write Prisma client
-  writeFileSync(
-    join(projectPath, "src", "lib", `prisma.${extension}`),
-    generatePrismaClient(typescript)
-  );
+    // Write Prisma files
+    writeFileSync(
+      join(projectPath, "prisma.config.ts"),
+      generatePrismaConfig()
+    );
 
-  // Write error middleware
-  writeFileSync(
-    join(projectPath, "src", "middlewares", `error.middleware.${extension}`),
-    generateErrorMiddleware(typescript)
-  );
+    writeFileSync(
+      join(projectPath, "prisma", "schema.prisma"),
+      generatePrismaSchema(config.database)
+    );
 
-  // Write Prisma files
-  writeFileSync(
-    join(projectPath, "prisma", "schema.prisma"),
-    generatePrismaSchema()
-  );
+    // Write Prisma client
+    writeFileSync(
+      join(projectPath, "src", "lib", `prisma.${extension}`),
+      generatePrismaClient(typescript, config.database)
+    );
 
-  writeFileSync(join(projectPath, "prisma.config.ts"), generatePrismaConfig());
+    // Write tsconfig.json if TypeScript
+    if (typescript) {
+      writeFileSync(join(projectPath, "tsconfig.json"), generateTsConfig());
+    }
 
-  // Write tsconfig.json if TypeScript
-  if (typescript) {
-    writeFileSync(join(projectPath, "tsconfig.json"), generateTsConfig());
+    // Write other files
+    writeFileSync(
+      join(projectPath, ".env"),
+      generateEnvFile(
+        database === Database.SQLite
+          ? "file:./dev.db"
+          : database === Database.PostgreSQL
+          ? "postgresql://user:password@host:port/database?schema=public"
+          : ""
+      )
+    );
+    writeFileSync(join(projectPath, ".gitignore"), generateGitignore());
+    writeFileSync(
+      join(projectPath, "README.md"),
+      generateReadme(projectName, typescript, packageManager, database)
+    );
+  } else {
+    console.error("Unsupported database");
   }
-
-  // Write other files
-  writeFileSync(join(projectPath, ".env"), generateEnvFile(database));
-  writeFileSync(join(projectPath, ".gitignore"), generateGitignore());
-  writeFileSync(
-    join(projectPath, "README.md"),
-    generateReadme(projectName, typescript, packageManager)
-  );
 };

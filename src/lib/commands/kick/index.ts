@@ -7,6 +7,8 @@ import { select } from "@inquirer/prompts";
 import {
   promptForProjectName,
   promptForTypeScript,
+  promptForDatabase,
+  promptForPackageManager,
 } from "@/lib/commands/kick/prompts.js";
 
 import {
@@ -16,39 +18,7 @@ import {
 
 import { resolveProjectPath } from "@/lib/utils/paths.js";
 
-interface FreshOptions {
-  template?: string;
-  database?: string;
-  typescript?: boolean;
-}
-
-const detectPackageManager = (): "pnpm" | "npm" | "yarn" => {
-  try {
-    execSync("pnpm --version", { stdio: "ignore" });
-    return "pnpm";
-  } catch {
-    try {
-      execSync("yarn --version", { stdio: "ignore" });
-      return "yarn";
-    } catch {
-      return "npm";
-    }
-  }
-};
-
-const promptForPackageManager = async (): Promise<"pnpm" | "npm" | "yarn"> => {
-  const detected = detectPackageManager();
-
-  return await select({
-    message: "Which package manager would you like to use?",
-    default: detected,
-    choices: [
-      { name: "pnpm (recommended)", value: "pnpm" },
-      { name: "npm", value: "npm" },
-      { name: "yarn", value: "yarn" },
-    ],
-  });
-};
+import { Database, FreshOptions } from "@/lib/types/index.js";
 
 export const registerFreshCommand = (program: Command): void => {
   program
@@ -62,6 +32,7 @@ export const registerFreshCommand = (program: Command): void => {
     )
     .option("--typescript", "Use TypeScript")
     .option("--no-typescript", "Use JavaScript")
+    .option("-p, --package-manager <package-manager>", "Package manager to use")
     .action(async (projectName: string | undefined, options: FreshOptions) => {
       try {
         // Prompt for project name if not provided
@@ -86,10 +57,16 @@ export const registerFreshCommand = (program: Command): void => {
             : await promptForTypeScript();
 
         // Prompt for database if not specified
-        const database = options.database || "sqlite";
+        const database =
+          options.database === Database.SQLite
+            ? options.database
+            : options.database === Database.PostgreSQL
+            ? options.database
+            : await promptForDatabase();
 
         // Prompt for package manager
-        const packageManager = await promptForPackageManager();
+        const packageManager =
+          options.packageManager || (await promptForPackageManager());
 
         console.log(
           chalk.blue(
@@ -129,39 +106,71 @@ export const registerFreshCommand = (program: Command): void => {
 
         console.log(chalk.green("\n✅ Dependencies installed!\n"));
 
-        const generateCmd =
-          packageManager === "npm"
-            ? `${packageManager} run db:generate`
-            : `${packageManager} db:generate`;
-
-        const pushCmd =
-          packageManager === "npm"
-            ? `${packageManager} run db:push`
-            : `${packageManager} db:push`;
-
-        execSync(generateCmd, {
-          cwd: projectPath,
-          stdio: "inherit",
-        });
-
-        execSync(pushCmd, {
-          cwd: projectPath,
-          stdio: "inherit",
-        });
-
-        console.log(chalk.green("\n✅ Database initialized!\n"));
-
-        console.log(chalk.green(`\n✅ Project created successfully!\n`));
-
-        console.log(chalk.cyan("Next steps:"));
-        console.log(chalk.gray(`cd ${projectName}`));
-        console.log(
-          chalk.gray(
+        if (database === Database.SQLite) {
+          const generateCmd =
             packageManager === "npm"
-              ? `${packageManager} run dev`
-              : `${packageManager} dev`
-          )
-        );
+              ? `${packageManager} run db:generate`
+              : `${packageManager} db:generate`;
+
+          const pushCmd =
+            packageManager === "npm"
+              ? `${packageManager} run db:push`
+              : `${packageManager} db:push`;
+
+          execSync(generateCmd, {
+            cwd: projectPath,
+            stdio: "inherit",
+          });
+
+          execSync(pushCmd, {
+            cwd: projectPath,
+            stdio: "inherit",
+          });
+
+          console.log(chalk.green("\n✅ Database initialized!\n"));
+
+          console.log(chalk.green(`\n✅ Project created successfully!\n`));
+
+          console.log(chalk.cyan("Next steps:"));
+
+          console.log(chalk.gray(`cd ${projectName}`));
+
+          console.log(
+            chalk.gray(
+              packageManager === "npm"
+                ? `${packageManager} run dev`
+                : `${packageManager} dev`
+            )
+          );
+        } else if (database === Database.PostgreSQL) {
+          console.log(chalk.green(`\n✅ Project created successfully!\n`));
+
+          console.log(chalk.cyan("Next steps:"));
+
+          console.log(chalk.gray(`cd ${projectName}`));
+
+          console.log(
+            chalk.yellow(
+              `🚨 Update DATABASE_URL in .env file with your database URL\n`
+            )
+          );
+
+          console.log(
+            chalk.gray(
+              packageManager === "npm"
+                ? `${packageManager} run db:generate`
+                : `${packageManager} db:generate`
+            )
+          );
+
+          console.log(
+            chalk.gray(
+              packageManager === "npm"
+                ? `${packageManager} run db:push`
+                : `${packageManager} db:push`
+            )
+          );
+        }
       } catch (error) {
         console.error(
           chalk.red(
