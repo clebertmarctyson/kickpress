@@ -205,7 +205,7 @@ export default errorHandler;
 
 export const generatePrismaClient = (
   typescript: boolean,
-  database: Database
+  database: Database,
 ): string => {
   // PostgreSQL
   if (database === Database.PostgreSQL) {
@@ -315,7 +315,7 @@ export const generateTsConfig = (): string => {
       exclude: ["node_modules", "dist"],
     },
     null,
-    2
+    2,
   );
 };
 
@@ -345,7 +345,7 @@ export const generateReadme = (
   projectName: string,
   typescript: boolean,
   packageManager: string,
-  database: Database
+  database: Database,
 ): string => {
   const pm = packageManager;
   const runCmd = pm === "npm" ? "npm run" : pm;
@@ -622,7 +622,7 @@ Made with ☕ and ❤️ by [Marc Tyson CLEBERT](https://www.marctysonclebert.co
 
 export const writeProjectFiles = (
   config: ProjectConfig,
-  packageManager: string
+  packageManager: string,
 ): void => {
   const { projectPath, projectName, typescript, database } = config;
   if (
@@ -632,37 +632,37 @@ export const writeProjectFiles = (
     // Write package.json
     writeFileSync(
       join(projectPath, "package.json"),
-      JSON.stringify(generatePackageJson(config), null, 2)
+      JSON.stringify(generatePackageJson(config), null, 2),
     );
 
     // Write main index file
     const extension = typescript ? "ts" : "js";
     writeFileSync(
       join(projectPath, "src", `index.${extension}`),
-      generateIndexFile(typescript)
+      generateIndexFile(typescript),
     );
 
     // Write error middleware
     writeFileSync(
       join(projectPath, "src", "middlewares", `error.middleware.${extension}`),
-      generateErrorMiddleware(typescript)
+      generateErrorMiddleware(typescript),
     );
 
     // Write Prisma files
     writeFileSync(
       join(projectPath, "prisma.config.ts"),
-      generatePrismaConfig()
+      generatePrismaConfig(),
     );
 
     writeFileSync(
       join(projectPath, "prisma", "schema.prisma"),
-      generatePrismaSchema(config.database)
+      generatePrismaSchema(config.database),
     );
 
     // Write Prisma client
     writeFileSync(
       join(projectPath, "src", "lib", `prisma.${extension}`),
-      generatePrismaClient(typescript, config.database)
+      generatePrismaClient(typescript, config.database),
     );
 
     // Write tsconfig.json if TypeScript
@@ -677,14 +677,14 @@ export const writeProjectFiles = (
         database === Database.SQLite
           ? "file:./dev.db"
           : database === Database.PostgreSQL
-          ? "postgresql://user:password@host:port/database?schema=public"
-          : ""
-      )
+            ? "postgresql://user:password@host:port/database?schema=public"
+            : "",
+      ),
     );
     writeFileSync(join(projectPath, ".gitignore"), generateGitignore());
     writeFileSync(
       join(projectPath, "README.md"),
-      generateReadme(projectName, typescript, packageManager, database)
+      generateReadme(projectName, typescript, packageManager, database),
     );
   } else {
     console.error("Unsupported database");

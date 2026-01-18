@@ -1,6 +1,7 @@
 import { input, select, confirm } from "@inquirer/prompts";
 
 import { detectProjectConfig } from "@/lib/commands/make/detect.js";
+
 import { Database } from "@/lib/types/index.js";
 
 export interface FreshAnswers {
@@ -15,7 +16,7 @@ export const promptForProjectName = async (): Promise<string> => {
   return await input({
     message: "What is your project name?",
     default: "my-kickpress-app",
-    validate: (value) => {
+    validate: (value: string) => {
       if (!value.trim()) {
         return "Project name cannot be empty";
       }
@@ -49,7 +50,7 @@ export const promptForTemplate = async (): Promise<string> => {
 export const promptForDatabase = async (): Promise<Database> => {
   return await select({
     message: "Which database would you like to use?",
-    default: "sqlite",
+    default: Database.SQLite,
     choices: [
       { name: "SQLite (default)", value: Database.SQLite },
       { name: "PostgreSQL", value: Database.PostgreSQL },
@@ -61,7 +62,7 @@ export const promptForPackageManager = async (): Promise<
   "pnpm" | "npm" | "yarn"
 > => {
   const defaultPackageManager = detectProjectConfig(
-    process.cwd()
+    process.cwd(),
   )?.packageManager;
 
   return await select({
