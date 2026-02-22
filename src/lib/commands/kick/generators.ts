@@ -4,22 +4,43 @@ import { Database, ProjectConfig } from "@/lib/types/index.js";
 
 import { join } from "path";
 
-export const createProjectStructure = (projectPath: string): void => {
-  const folders = [
-    "src",
-    "src/controllers",
-    "src/models",
-    "src/routes",
-    "src/validations",
-    "src/middlewares",
-    "src/config",
-    "src/utils",
-    "src/lib",
-    "src/types",
-    "public",
-    "prisma",
-    "requests",
-  ];
+export const createProjectStructure = (
+  projectPath: string,
+  database: Database,
+  template: string,
+): void => {
+  const common = ["src", "src/utils", "src/lib", "src/types"];
+
+  let folders: string[] = [];
+
+  switch (template) {
+    case "npm":
+      folders = ["src"];
+      break;
+    case "cli":
+      folders = [...common, "src/commands", "src/bin"];
+      break;
+    case "web":
+      folders = [...common, "src/middlewares", "public"];
+      break;
+    case "api":
+    default:
+      folders = [
+        ...common,
+        "src/controllers",
+        "src/models",
+        "src/routes",
+        "src/validations",
+        "src/middlewares",
+        "src/config",
+        "src/services",
+        "requests",
+      ];
+  }
+
+  if (database !== Database.None) {
+    folders.push("prisma");
+  }
 
   folders.forEach((folder) => {
     mkdirSync(join(projectPath, folder), { recursive: true });
@@ -27,60 +48,101 @@ export const createProjectStructure = (projectPath: string): void => {
 };
 
 export const generatePackageJson = (config: ProjectConfig): object => {
-  const { projectName, typescript } = config;
+  const { projectName, typescript, database, template } = config;
 
-  const dependencies: Record<string, string> = {
-    express: "^4.18.2",
-    "express-async-handler": "^1.2.0",
-    zod: "^4.1.13",
-  };
-
+  const dependencies: Record<string, string> = {};
   const devDependencies: Record<string, string> = {
-    "@types/node": "^20.10.6",
-    "@types/express": "^4.17.21",
+    "@types/node": "^25.3.0",
   };
 
-  if (config.database === Database.SQLite) {
-    dependencies["@types/better-sqlite3"] = "^7.6.13";
-    dependencies["better-sqlite3"] = "^12.5.0";
-    dependencies["@prisma/adapter-better-sqlite3"] = "^7.1.0";
-  } else if (config.database === Database.PostgreSQL) {
-    dependencies["@prisma/adapter-pg"] = "^7.1.0";
+  // Template-specific deps and scripts
+  const scripts: Record<string, string> = {};
+
+  if (template === "npm") {
+    // Pure library — no runtime deps beyond what the user adds
+    if (typescript) {
+      devDependencies.typescript = "^5.9.3";
+      devDependencies.tsx = "^4.21.0";
+      scripts.dev = "tsc --watch";
+      scripts.build = "tsc";
+      scripts.prepublishOnly = "npm run build";
+    } else {
+      scripts.dev = "node --watch src/index.js";
+      scripts.prepublishOnly = "echo 'Ready to publish'";
+    }
+
+    const pkg: any = {
+      name: projectName,
+      version: "0.1.0",
+      type: "module",
+      main: typescript ? "dist/index.js" : "src/index.js",
+      ...(typescript && { types: "dist/index.d.ts" }),
+      exports: {
+        ".": {
+          ...(typescript && { types: "./dist/index.d.ts" }),
+          default: typescript ? "./dist/index.js" : "./src/index.js",
+        },
+      },
+      files: ["dist", "README.md"],
+      scripts,
+      dependencies,
+      devDependencies,
+      license: "MIT",
+    };
+    return pkg;
   }
 
-  dependencies["@prisma/client"] = "^7.1.0";
-  dependencies.dotenv = "^17.2.3";
-
-  devDependencies.prisma = "^7.1.0";
-
-  // Add TypeScript dependencies
-  if (typescript) {
-    devDependencies.typescript = "^5.3.3";
-    devDependencies.tsx = "^4.7.0";
+  if (template === "cli") {
+    dependencies.commander = "^14.0.0";
+    if (typescript) {
+      devDependencies.tsx = "^4.21.0";
+      scripts.dev = "tsx watch src/cli.ts";
+      scripts.build = "tsc";
+      scripts.start = "node dist/cli.js";
+    } else {
+      scripts.dev = "node --watch src/cli.js";
+      scripts.start = "node src/cli.js";
+    }
   } else {
-    dependencies["@prisma/client-runtime-utils"] = "^7.1.0";
+    // api / web — Express-based
+    dependencies.express = "^5.2.1";
+    dependencies["express-async-handler"] = "^1.2.0";
+    dependencies.zod = "^4.3.6";
+    dependencies.dotenv = "^17.3.1";
+    devDependencies["@types/express"] = "^5.0.6";
+
+    if (database !== Database.None) {
+      if (database === Database.SQLite) {
+        dependencies["better-sqlite3"] = "^12.6.2";
+        dependencies["@prisma/adapter-better-sqlite3"] = "^7.4.1";
+        devDependencies["@types/better-sqlite3"] = "^7.6.13";
+      } else if (database === Database.PostgreSQL) {
+        dependencies["@prisma/adapter-pg"] = "^7.4.1";
+      }
+      dependencies["@prisma/client"] = "^7.4.1";
+      devDependencies.prisma = "^7.4.1";
+      scripts["db:generate"] = "prisma generate";
+      scripts["db:push"] = "prisma db push";
+      scripts["db:migrate"] = "prisma migrate dev";
+      scripts["db:studio"] = "prisma studio";
+    }
+
+    if (typescript) {
+      scripts.dev = "tsx watch --env-file=.env src/index.ts";
+      scripts.build = "tsc";
+      scripts.start = "node --env-file=.env dist/index.js";
+    } else {
+      scripts.dev = "node --watch --env-file=.env src/index.js";
+      scripts.start = "node --env-file=.env src/index.js";
+    }
   }
 
-  const scripts: Record<string, string> = typescript
-    ? {
-        dev: "tsx watch --env-file=.env src/index.ts",
-        build: "tsc",
-        start: "node --env-file=.env dist/index.js",
-        "db:generate": "prisma generate",
-        "db:push": "prisma db push",
-        "db:migrate": "prisma migrate dev",
-        "db:studio": "prisma studio",
-      }
-    : {
-        dev: "node --watch --env-file=.env src/index.js",
-        start: "node --env-file=.env src/index.js",
-        "db:generate": "prisma generate",
-        "db:push": "prisma db push",
-        "db:migrate": "prisma migrate dev",
-        "db:studio": "prisma studio",
-      };
+  if (typescript) {
+    devDependencies.typescript = "^5.9.3";
+    devDependencies.tsx = "^4.21.0";
+  }
 
-  return {
+  const pkg: any = {
     name: projectName,
     version: "1.0.0",
     type: "module",
@@ -90,12 +152,22 @@ export const generatePackageJson = (config: ProjectConfig): object => {
     devDependencies,
     license: "MIT",
   };
+
+  if (template === "cli") {
+    pkg.bin = {
+      [projectName]: typescript ? "dist/cli.js" : "src/cli.js",
+    };
+  }
+
+  return pkg;
 };
 
-export const generateIndexFile = (typescript: boolean): string => {
+export const generateIndexFile = (typescript: boolean, template: string): string => {
+  const isWeb = template === "web";
+
   if (typescript) {
     return `import express, { Request, Response } from "express";
-    
+
 import errorHandler from "./middlewares/error.middleware";
 
 const app = express();
@@ -104,11 +176,10 @@ const PORT = process.env.PORT || 3000;
 // Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(express.static("public"));
-
+${isWeb ? 'app.use(express.static("public"));\n' : ""}
 // Routes
-app.get("/", (_: Request, res: Response) => {
-  res.json({ message: "Welcome to Kickpress!" });
+app.get("/api", (_: Request, res: Response) => {
+  res.json({ message: "Welcome to my app" });
 });
 
 // Error Handler
@@ -130,11 +201,10 @@ const PORT = process.env.PORT || 3000;
 // Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(express.static("public"));
-
+${isWeb ? 'app.use(express.static("public"));\n' : ""}
 // Routes
-app.get("/", (_, res) => {
-  res.json({ message: "Welcome to Kickpress!" });
+app.get("/api", (_, res) => {
+  res.json({ message: "Welcome to my app" });
 });
 
 // Error Handler
@@ -146,16 +216,20 @@ app.listen(PORT, () => {
 `;
 };
 
-export const generateErrorMiddleware = (typescript: boolean): string => {
+export const generateErrorMiddleware = (
+  typescript: boolean,
+  withDatabase = false,
+): string => {
   if (typescript) {
-    return `import { Prisma } from "../lib/generated/prisma/client";
+    if (withDatabase) {
+      return `import { Prisma } from "../lib/generated/prisma/client";
 import { NextFunction, Request, Response } from "express";
 
 const errorHandler = (
   err: Error | Prisma.PrismaClientKnownRequestError,
-  req: Request,
+  _req: Request,
   res: Response,
-  next: NextFunction
+  _next: NextFunction
 ) => {
   let statusCode = res.statusCode !== 200 ? res.statusCode : 500;
   let message: string | object = err.message;
@@ -171,7 +245,27 @@ const errorHandler = (
   }
 
   res.status(statusCode).json({
-    message: message,
+    message,
+    stack: process.env.NODE_ENV === "production" ? null : err.stack,
+  });
+};
+
+export default errorHandler;
+`;
+    }
+
+    return `import { NextFunction, Request, Response } from "express";
+
+const errorHandler = (
+  err: Error,
+  _req: Request,
+  res: Response,
+  _next: NextFunction
+) => {
+  const statusCode = res.statusCode !== 200 ? res.statusCode : 500;
+
+  res.status(statusCode).json({
+    message: err.message,
     stack: process.env.NODE_ENV === "production" ? null : err.stack,
   });
 };
@@ -180,7 +274,8 @@ export default errorHandler;
 `;
   }
 
-  return `const errorHandler = (err, req, res, next) => {
+  if (withDatabase) {
+    return `const errorHandler = (err, _req, res, _next) => {
   let statusCode = res.statusCode !== 200 ? res.statusCode : 500;
   let message = err.message;
 
@@ -194,7 +289,20 @@ export default errorHandler;
   }
 
   res.status(statusCode).json({
-    message: message,
+    message,
+    stack: process.env.NODE_ENV === "production" ? null : err.stack,
+  });
+};
+
+export default errorHandler;
+`;
+  }
+
+  return `const errorHandler = (err, _req, res, _next) => {
+  const statusCode = res.statusCode !== 200 ? res.statusCode : 500;
+
+  res.status(statusCode).json({
+    message: err.message,
     stack: process.env.NODE_ENV === "production" ? null : err.stack,
   });
 };
@@ -207,41 +315,14 @@ export const generatePrismaClient = (
   typescript: boolean,
   database: Database,
 ): string => {
-  // PostgreSQL
   if (database === Database.PostgreSQL) {
     if (typescript) {
       return `import { PrismaClient } from "./generated/prisma/client";
-  import { PrismaPg } from "@prisma/adapter-pg";
-  
-  const adapter = new PrismaPg({
-    connectionString: process.env.DATABASE_URL!,
-  });
-  
-  const prisma = new PrismaClient({ adapter });
-  
-  export default prisma;
-  `;
-    }
+import { PrismaPg } from "@prisma/adapter-pg";
 
-    return `import { PrismaClient } from "./generated/prisma/index.js";
-  import { PrismaPg } from "@prisma/adapter-pg";
-  
-  const adapter = new PrismaPg({
-    connectionString: process.env.DATABASE_URL,
-  });
-  
-  const prisma = new PrismaClient({ adapter });
-  
-  export default prisma;
-  `;
-  } else {
-    if (typescript) {
-      return `import { PrismaClient } from "./generated/prisma/client";
-import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
-import Database from "better-sqlite3";
-
-const db = new Database(process.env.DATABASE_URL!);
-const adapter = new PrismaBetterSqlite3(db);
+const adapter = new PrismaPg({
+  connectionString: process.env.DATABASE_URL!,
+});
 
 const prisma = new PrismaClient({ adapter });
 
@@ -250,17 +331,44 @@ export default prisma;
     }
 
     return `import { PrismaClient } from "./generated/prisma/index.js";
-import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
-import Database from "better-sqlite3";
+import { PrismaPg } from "@prisma/adapter-pg";
 
-const db = new Database(process.env.DATABASE_URL);
-const adapter = new PrismaBetterSqlite3(db);
+const adapter = new PrismaPg({
+  connectionString: process.env.DATABASE_URL,
+});
 
 const prisma = new PrismaClient({ adapter });
 
 export default prisma;
 `;
   }
+
+  // SQLite
+  if (typescript) {
+    return `import { PrismaClient } from "./generated/prisma/client";
+import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
+
+const adapter = new PrismaBetterSqlite3({
+  url: process.env.DATABASE_URL!,
+});
+
+const prisma = new PrismaClient({ adapter });
+
+export default prisma;
+`;
+  }
+
+  return `import { PrismaClient } from "./generated/prisma/index.js";
+import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
+
+const adapter = new PrismaBetterSqlite3({
+  url: process.env.DATABASE_URL,
+});
+
+const prisma = new PrismaClient({ adapter });
+
+export default prisma;
+`;
 };
 
 export const generatePrismaSchema = (provider: string): string => {
@@ -292,31 +400,29 @@ export default defineConfig({
 `;
 };
 
-export const generateTsConfig = (): string => {
-  return JSON.stringify(
-    {
-      compilerOptions: {
-        target: "ES2022",
-        module: "ESNext",
-        moduleResolution: "bundler",
-        outDir: "./dist",
-        rootDir: "./src",
-        strict: true,
-        esModuleInterop: true,
-        skipLibCheck: true,
-        forceConsistentCasingInFileNames: true,
-        resolveJsonModule: true,
-        allowSyntheticDefaultImports: true,
-        paths: {
-          "@/*": ["./src/*"],
-        },
-      },
-      include: ["src/**/*"],
-      exclude: ["node_modules", "dist"],
+export const generateTsConfig = (npmPackage = false): string => {
+  const base = {
+    compilerOptions: {
+      target: "ES2022",
+      module: "ESNext",
+      moduleResolution: "bundler",
+      outDir: "./dist",
+      rootDir: "./src",
+      strict: true,
+      esModuleInterop: true,
+      skipLibCheck: true,
+      forceConsistentCasingInFileNames: true,
+      resolveJsonModule: true,
+      allowSyntheticDefaultImports: true,
+      types: ["node"],
+      ...(npmPackage
+        ? { declaration: true, declarationDir: "./dist" }
+        : { paths: { "@/*": ["./src/*"] } }),
     },
-    null,
-    2,
-  );
+    include: ["src/**/*"],
+    exclude: ["node_modules", "dist"],
+  };
+  return JSON.stringify(base, null, 2);
 };
 
 export const generateEnvFile = (database: string): string => {
@@ -326,19 +432,35 @@ DATABASE_URL="${database}"
 `;
 };
 
-export const generateGitignore = (): string => {
+export const generateNpmIgnore = (): string => {
+  return `src/
+*.ts
+!dist/
+node_modules/
+.env
+*.log
+.DS_Store
+tsconfig.json
+`;
+};
+
+export const generateGitignore = (withDatabase = false): string => {
   return `node_modules
 .env
 .env.local
 dist
 *.log
 .DS_Store
-
+${
+  withDatabase
+    ? `
 # Prisma
 *.db
 *.db-journal
 src/lib/generated/
-`;
+`
+    : ""
+}`;
 };
 
 export const generateReadme = (
@@ -346,12 +468,94 @@ export const generateReadme = (
   typescript: boolean,
   packageManager: string,
   database: Database,
+  template = "api",
 ): string => {
   const pm = packageManager;
   const runCmd = pm === "npm" ? "npm run" : pm;
 
+  // ── NPM PACKAGE README ────────────────────────────────────────────────────
+  if (template === "npm") {
+    return `# ${projectName}
+
+A brief description of your package.
+
+## Installation
+
+\`\`\`bash
+npm install ${projectName}
+\`\`\`
+
+## Usage
+
+\`\`\`${typescript ? "typescript" : "javascript"}
+import { hello } from "${projectName}";
+
+console.log(hello("World")); // Hello, World!
+\`\`\`
+
+## Development
+
+\`\`\`bash
+# Watch mode
+${runCmd} dev
+
+# Build
+${runCmd} build
+\`\`\`
+
+## Publishing
+
+\`\`\`bash
+npm publish
+\`\`\`
+
+---
+
+Made with ☕ and ❤️ by [Kickpress](https://github.com/clebertmarctyson/kickpress)
+`;
+  }
+
+  // ── CLI README ────────────────────────────────────────────────────────────
+  if (template === "cli") {
+    return `# ${projectName}
+
+A Node.js CLI tool.
+
+## Installation
+
+\`\`\`bash
+npm install -g ${projectName}
+\`\`\`
+
+## Usage
+
+\`\`\`bash
+${projectName} hello
+\`\`\`
+
+## Development
+
+\`\`\`bash
+# Watch mode
+${runCmd} dev
+
+# Build
+${runCmd} build
+
+# Run locally
+${runCmd} start
+\`\`\`
+
+---
+
+Made with ☕ and ❤️ by [Kickpress](https://github.com/clebertmarctyson/kickpress)
+`;
+  }
+
   const databaseSetupSection =
-    database === "postgresql"
+    database === "none"
+      ? `### 2. Start Development Server`
+      : database === "postgresql"
       ? `### 2. Configure Database
 
 Update your \`.env\` file with your PostgreSQL connection string:
@@ -389,7 +593,12 @@ ${runCmd} db:push
 ### 3. Start Development Server`;
 
   const envVarsSection =
-    database === "postgresql"
+    database === "none"
+      ? `\`\`\`env
+PORT=3000
+NODE_ENV=development
+\`\`\``
+      : database === "postgresql"
       ? `\`\`\`env
 PORT=3000
 NODE_ENV=development
@@ -402,7 +611,9 @@ DATABASE_URL="file:./dev.db"
 \`\`\``;
 
   const techStackDatabase =
-    database === "postgresql"
+    database === "none"
+      ? ""
+      : database === "postgresql"
       ? "- **PostgreSQL** - Powerful, open source object-relational database"
       : "- **SQLite** - Default database (easily swappable)";
 
@@ -415,16 +626,14 @@ A production-ready Express.js API with TypeScript, Prisma ORM, and best practice
 ## 🚀 Getting Started
 
 ${
-  pm === "pnpm"
+  pm === "pnpm" && database === "sqlite"
     ? `### ⚠️ Important: Approve Native Builds (pnpm only)
 
 Before running the project, you need to approve native dependencies:
 
 \`\`\`bash
 pnpm approve-builds
-# Select: ${
-        database === "sqlite" ? "better-sqlite3" : "the required packages"
-      } (press space, then enter)
+# Select: better-sqlite3 (press space, then enter)
 \`\`\`
 
 This is a one-time setup required by pnpm for native dependencies.
@@ -469,29 +678,24 @@ ${
 - \`${runCmd} start\` - Start production server
 
 `
-}### Database Management
+}${
+  database !== "none"
+    ? `### Database Management
 - \`${runCmd} db:generate\` - Generate Prisma Client
 - \`${runCmd} db:push\` - Push schema changes to database
 - \`${runCmd} db:migrate\` - Create a new migration
 - \`${runCmd} db:studio\` - Open Prisma Studio (database GUI)
 
-## 🎯 Generate Resources
+`
+    : ""
+}## 🎯 Generate Resources
 
 Kickpress can generate complete CRUD resources for any entity:
 
 \`\`\`bash
-# Generate everything (routes, controller, model, types, HTTP requests)
-npx kickpress make user resources
-npx kickpress gen post resources     # Short alias
-
-# Generate individual components
-npx kickpress make user model
-npx kickpress make user controller
-npx kickpress make user routes
+# Generate all resources (model, service, controller, routes, validations, HTTP requests)
+npx kickpress make user
 \`\`\`
-
-**Available aliases:**
-- \`make\` / \`m\` / \`gen\` / \`g\` / \`generate\`
 
 ## 📁 Project Structure
 
@@ -499,9 +703,11 @@ npx kickpress make user routes
 ${projectName}/
 ├── src/
 │   ├── index.${typescript ? "ts" : "js"}           # Main entry point
-│   ├── lib/
-│   │   └── prisma.${typescript ? "ts" : "js"}      # Prisma client
-│   ├── controllers/                  # Request handlers
+${
+  database !== "none"
+    ? `│   ├── lib/\n│   │   └── prisma.${typescript ? "ts" : "js"}      # Prisma client\n`
+    : ""
+}│   ├── controllers/                  # Request handlers
 │   ├── models/                       # Database operations
 │   ├── routes/                       # Express routes
 ${
@@ -510,10 +716,11 @@ ${
 │   │   └── error.middleware.${typescript ? "ts" : "js"}
 │   ├── config/                       # Configuration
 │   └── utils/                        # Utilities
-├── prisma/
-│   ├── schema.prisma                 # Database schema
-│   └── migrations/                   # Database migrations
-├── requests/                         # HTTP test files
+${
+  database !== "none"
+    ? `├── prisma/\n│   ├── schema.prisma                 # Database schema\n│   └── migrations/                   # Database migrations\n`
+    : ""
+}├── requests/                         # HTTP test files
 ├── .env                              # Environment variables
 ${
   typescript
@@ -553,16 +760,13 @@ ${envVarsSection}
 - **Express.js** - Fast, minimalist web framework
 ${typescript ? "- **TypeScript** - Type-safe JavaScript\n" : ""}${
     typescript ? "- **tsx** - TypeScript execution engine\n" : ""
-  }- **Prisma** - Next-generation ORM
-${techStackDatabase}
-- **express-async-handler** - Async error handling
+  }${database !== "none" ? "- **Prisma** - Next-generation ORM\n" : ""}${techStackDatabase ? techStackDatabase + "\n" : ""}- **express-async-handler** - Async error handling
 
 ## 📚 Learn More
 
 - [Kickpress Documentation](https://github.com/clebertmarctyson/kickpress#readme)
 - [Express.js Docs](https://expressjs.com/)
-- [Prisma Docs](https://www.prisma.io/docs)
-${typescript ? "- [TypeScript Docs](https://www.typescriptlang.org/)\n" : ""}${
+${database !== "none" ? "- [Prisma Docs](https://www.prisma.io/docs)\n" : ""}${typescript ? "- [TypeScript Docs](https://www.typescriptlang.org/)\n" : ""}${
     database === "postgresql"
       ? "- [PostgreSQL Docs](https://www.postgresql.org/docs/)\n"
       : ""
@@ -575,12 +779,16 @@ Change the port in \`.env\`:
 PORT=3001
 \`\`\`
 
-### Prisma Client errors
+${
+  database !== "none"
+    ? `### Prisma Client errors
 Regenerate the Prisma client:
 \`\`\`bash
 ${runCmd} db:generate
 \`\`\`
-${
+`
+    : ""
+}${
   database === "postgresql"
     ? `
 ### Database connection errors
@@ -597,13 +805,13 @@ psql "${process.env.DATABASE_URL}"
 `
     : ""
 }${
-    pm === "pnpm"
+    pm === "pnpm" && database === "sqlite"
       ? `
 ### Module not found errors (pnpm)
 Make sure you've approved native builds:
 \`\`\`bash
 pnpm approve-builds
-# Select: ${database === "sqlite" ? "better-sqlite3" : "required packages"}
+# Select: better-sqlite3
 \`\`\`
 `
       : ""
@@ -624,53 +832,135 @@ export const writeProjectFiles = (
   config: ProjectConfig,
   packageManager: string,
 ): void => {
-  const { projectPath, projectName, typescript, database } = config;
-  if (
-    config.database === Database.SQLite ||
-    config.database === Database.PostgreSQL
-  ) {
-    // Write package.json
-    writeFileSync(
-      join(projectPath, "package.json"),
-      JSON.stringify(generatePackageJson(config), null, 2),
-    );
+  const { projectPath, projectName, typescript, database, template } = config;
+  const extension = typescript ? "ts" : "js";
 
-    // Write main index file
-    const extension = typescript ? "ts" : "js";
-    writeFileSync(
-      join(projectPath, "src", `index.${extension}`),
-      generateIndexFile(typescript),
-    );
+  // Write package.json
+  writeFileSync(
+    join(projectPath, "package.json"),
+    JSON.stringify(generatePackageJson(config), null, 2),
+  );
 
-    // Write error middleware
+  // TS config when needed
+  if (typescript) {
     writeFileSync(
-      join(projectPath, "src", "middlewares", `error.middleware.${extension}`),
-      generateErrorMiddleware(typescript),
+      join(projectPath, "tsconfig.json"),
+      generateTsConfig(template === "npm"),
     );
+  }
 
+  // Common files
+  writeFileSync(join(projectPath, ".gitignore"), generateGitignore(database !== Database.None));
+  writeFileSync(
+    join(projectPath, "README.md"),
+    generateReadme(projectName, typescript, packageManager, database, template),
+  );
+
+  // ── NPM PACKAGE ──────────────────────────────────────────────────────────
+  if (template === "npm") {
+    writeFileSync(join(projectPath, ".npmignore"), generateNpmIgnore());
+
+    const libEntry = typescript
+      ? `/**
+ * ${projectName}
+ * A brief description of your package.
+ */
+
+export const hello = (name: string): string => \`Hello, \${name}!\`;
+`
+      : `/**
+ * ${projectName}
+ * A brief description of your package.
+ */
+
+export const hello = (name) => \`Hello, \${name}!\`;
+`;
+    writeFileSync(join(projectPath, "src", `index.${extension}`), libEntry);
+    return; // no .env, no Prisma, no Express
+  }
+
+  // ── CLI ──────────────────────────────────────────────────────────────────
+  if (template === "cli") {
+    const cliContent = `#!/usr/bin/env node
+import { Command } from "commander";
+
+const program = new Command();
+program
+  .name(process.env.npm_package_name || "${projectName}")
+  .description("${projectName} CLI")
+  .version("0.0.1");
+
+program
+  .command("hello")
+  .description("Say hello")
+  .action(() => {
+    console.log("Hello from ${projectName} CLI");
+  });
+
+program.parse();
+`;
+    writeFileSync(join(projectPath, "src", `cli.${extension}`), cliContent);
+    return; // no .env, no Prisma
+  }
+
+  // ── EXPRESS-BASED (api / web) ─────────────────────────────────────────────
+  writeFileSync(
+    join(projectPath, "src", `index.${extension}`),
+    generateIndexFile(typescript, template),
+  );
+  writeFileSync(
+    join(projectPath, "src", "middlewares", `error.middleware.${extension}`),
+    generateErrorMiddleware(typescript, database !== Database.None),
+  );
+
+  if (template === "web") {
+    writeFileSync(
+      join(projectPath, "public", "index.html"),
+      `<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>${projectName}</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <h1>Welcome to ${projectName}</h1>
+    <div id="root"></div>
+    <script src="/app.js"></script>
+  </body>
+</html>`,
+    );
+    writeFileSync(
+      join(projectPath, "public", "styles.css"),
+      `*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: system-ui, sans-serif; padding: 2rem; }
+h1 { margin-bottom: 1rem; }
+`,
+    );
+    writeFileSync(
+      join(projectPath, "public", "app.js"),
+      `console.log("${projectName} running");
+`,
+    );
+  }
+
+  // Prisma / DB files if database selected
+  if (database !== Database.None) {
     // Write Prisma files
     writeFileSync(
       join(projectPath, "prisma.config.ts"),
       generatePrismaConfig(),
     );
-
     writeFileSync(
       join(projectPath, "prisma", "schema.prisma"),
-      generatePrismaSchema(config.database),
+      generatePrismaSchema(database),
     );
-
-    // Write Prisma client
     writeFileSync(
       join(projectPath, "src", "lib", `prisma.${extension}`),
-      generatePrismaClient(typescript, config.database),
+      generatePrismaClient(typescript, database),
     );
 
-    // Write tsconfig.json if TypeScript
-    if (typescript) {
-      writeFileSync(join(projectPath, "tsconfig.json"), generateTsConfig());
-    }
-
-    // Write other files
     writeFileSync(
       join(projectPath, ".env"),
       generateEnvFile(
@@ -681,12 +971,11 @@ export const writeProjectFiles = (
             : "",
       ),
     );
-    writeFileSync(join(projectPath, ".gitignore"), generateGitignore());
-    writeFileSync(
-      join(projectPath, "README.md"),
-      generateReadme(projectName, typescript, packageManager, database),
-    );
   } else {
-    console.error("Unsupported database");
+    // Write .env without DATABASE_URL
+    writeFileSync(
+      join(projectPath, ".env"),
+      `PORT=3000\nNODE_ENV=development\n`,
+    );
   }
 };

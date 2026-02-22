@@ -80,20 +80,19 @@ export const injectRouteIntoIndex = async (
       routeStatement +
       updatedContent.slice(insertPosition);
   } else {
-    // Add before the default "/" route
-    const defaultRouteRegex = /app\.get\(["']\/["']/;
-
-    if (defaultRouteRegex.test(updatedContent)) {
+    // Inject after existing "// Routes" comment if present (reuse it, no duplicate)
+    const routesCommentRegex = /\/\/\s*Routes\n/;
+    if (routesCommentRegex.test(updatedContent)) {
       updatedContent = updatedContent.replace(
-        defaultRouteRegex,
-        `// Routes\n${routeStatement}\n\n$&`
+        routesCommentRegex,
+        `// Routes\n${routeStatement}\n\n`
       );
     } else {
-      // Add after middleware as fallback
-      const middlewareRegex = /app\.use\(express\.static\([^)]+\)\);?/;
+      // Fallback: add before "// Error Handler"
+      const errorHandlerRegex = /\/\/\s*Error Handler/;
       updatedContent = updatedContent.replace(
-        middlewareRegex,
-        (match) => `${match}\n\n// Routes\n${routeStatement}`
+        errorHandlerRegex,
+        `// Routes\n${routeStatement}\n\n// Error Handler`
       );
     }
   }

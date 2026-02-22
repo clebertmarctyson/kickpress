@@ -33,66 +33,60 @@ const generateTypeScriptController = (
   tableName: string
 ): string => {
   return `import { Request, Response } from "express";
-
 import asyncHandler from "express-async-handler";
-
 import {
-  ${entity}FindAll,
-  ${entity}FindOne,
-  ${entity}Create,
-  ${entity}Update,
-  ${entity}Delete,
-} from "../models/${entity}.model";
+  getAll${entityCapitalized}s,
+  get${entityCapitalized},
+  create${entityCapitalized},
+  update${entityCapitalized},
+  delete${entityCapitalized},
+} from "../services/${entity}.service";
 
 const all = asyncHandler(async (_: Request, res: Response) => {
-  const ${tableName} = await ${entity}FindAll();
+  const ${tableName} = await getAll${entityCapitalized}s();
   res.json(${tableName});
 });
 
 const findOne = asyncHandler(async (req: Request, res: Response) => {
   const { id } = req.params;
-  const ${entity} = await ${entity}FindOne(Number(id));
-  
+  const ${entity} = await get${entityCapitalized}(Number(id));
+
   if (!${entity}) {
     res.status(404);
     throw new Error("${entityCapitalized} not found");
   }
-  
+
   res.json(${entity});
 });
 
 const create = asyncHandler(async (req: Request, res: Response) => {
-  const ${entity} = await ${entity}Create(req.body);
+  const ${entity} = await create${entityCapitalized}(req.body);
   res.status(201).json(${entity});
 });
 
 const update = asyncHandler(async (req: Request, res: Response) => {
   const { id } = req.params;
-
-  const ${entity} = await ${entity}FindOne(Number(id));
+  const ${entity} = await get${entityCapitalized}(Number(id));
 
   if (!${entity}) {
     res.status(404);
     throw new Error("${entityCapitalized} not found");
   }
 
-  const updated${entityCapitalized} = await ${entity}Update(${entity}.id, req.body);
-
+  const updated${entityCapitalized} = await update${entityCapitalized}(${entity}.id, req.body);
   res.json(updated${entityCapitalized});
 });
 
 const remove = asyncHandler(async (req: Request, res: Response) => {
   const { id } = req.params;
-
-  const ${entity} = await ${entity}FindOne(Number(id));
+  const ${entity} = await get${entityCapitalized}(Number(id));
 
   if (!${entity}) {
     res.status(404);
     throw new Error("${entityCapitalized} not found");
   }
 
-  await ${entity}Delete(${entity}.id);
-
+  await delete${entityCapitalized}(${entity}.id);
   res.status(204).send();
 });
 
@@ -107,62 +101,58 @@ const generateJavaScriptController = (
 ): string => {
   return `import asyncHandler from "express-async-handler";
 import {
-  ${entity}FindAll,
-  ${entity}FindOne,
-  ${entity}Create,
-  ${entity}Update,
-  ${entity}Delete,
-} from "../models/${entity}.model.js";
+  getAll${entityCapitalized}s,
+  get${entityCapitalized},
+  create${entityCapitalized},
+  update${entityCapitalized},
+  delete${entityCapitalized},
+} from "../services/${entity}.service.js";
 
 const all = asyncHandler(async (_, res) => {
-  const ${tableName} = await ${entity}FindAll();
+  const ${tableName} = await getAll${entityCapitalized}s();
   res.json(${tableName});
 });
 
 const findOne = asyncHandler(async (req, res) => {
   const { id } = req.params;
-  const ${entity} = await ${entity}FindOne(Number(id));
-  
+  const ${entity} = await get${entityCapitalized}(Number(id));
+
   if (!${entity}) {
     res.status(404);
     throw new Error("${entityCapitalized} not found");
   }
-  
+
   res.json(${entity});
 });
 
 const create = asyncHandler(async (req, res) => {
-  const ${entity} = await ${entity}Create(req.body);
+  const ${entity} = await create${entityCapitalized}(req.body);
   res.status(201).json(${entity});
 });
 
 const update = asyncHandler(async (req, res) => {
   const { id } = req.params;
-
-  const ${entity} = await ${entity}FindOne(Number(id));
+  const ${entity} = await get${entityCapitalized}(Number(id));
 
   if (!${entity}) {
     res.status(404);
     throw new Error("${entityCapitalized} not found");
   }
 
-  const updated${entityCapitalized} = await ${entity}Update(${entity}.id, req.body);
-
+  const updated${entityCapitalized} = await update${entityCapitalized}(${entity}.id, req.body);
   res.json(updated${entityCapitalized});
 });
 
 const remove = asyncHandler(async (req, res) => {
   const { id } = req.params;
-
-  const ${entity} = await ${entity}FindOne(Number(id));
+  const ${entity} = await get${entityCapitalized}(Number(id));
 
   if (!${entity}) {
     res.status(404);
     throw new Error("${entityCapitalized} not found");
   }
 
-  await ${entity}Delete(${entity}.id);
-
+  await delete${entityCapitalized}(${entity}.id);
   res.status(204).send();
 });
 

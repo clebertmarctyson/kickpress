@@ -3,6 +3,7 @@ export enum Database {
   PostgreSQL = "postgresql",
   MySQL = "mysql",
   MongoDB = "mongodb",
+  None = "none",
 }
 
 export enum PackageManager {
@@ -24,4 +25,5 @@ export interface FreshOptions {
   database?: Database;
   typescript?: boolean;
   packageManager?: PackageManager;
+  yes?: boolean;
 }

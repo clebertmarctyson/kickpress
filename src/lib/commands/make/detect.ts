@@ -6,6 +6,7 @@ export interface ProjectConfig {
   packageManager: "pnpm" | "npm" | "yarn";
   srcDir: string;
   fileExtension: string;
+  hasDatabase: boolean;
 }
 
 export const detectProjectConfig = (
@@ -41,10 +42,15 @@ export const detectProjectConfig = (
     packageManager = "npm";
   }
 
+  const hasDatabase =
+    !!packageJson.dependencies?.["@prisma/client"] ||
+    !!packageJson.devDependencies?.prisma;
+
   return {
     typescript,
     packageManager,
     srcDir: "src",
     fileExtension: typescript ? "ts" : "js",
+    hasDatabase,
   };
 };

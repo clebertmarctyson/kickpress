@@ -11,25 +11,19 @@ import { generateModel } from "@/lib/commands/make/generators/model.js";
 import { generateTypes } from "@/lib/commands/make/generators/types.js";
 import { generateHttpRequests } from "@/lib/commands/make/generators/http.js";
 import { updatePrismaSchema } from "@/lib/commands/make/generators/schema.js";
+import { generateService } from "@/lib/commands/make/generators/service.js";
 import { injectRouteIntoIndex } from "@/lib/commands/make/injectors/index-injector.js";
 import { capitalizeFirst } from "@/lib/utils/index.js";
 
-type ResourceType =
-  | "routes"
-  | "controller"
-  | "model"
-  | "resources"
-  | "validation";
-
 export const registerInventCommand = (program: Command): void => {
   program
-    .command("make <entity> <type>")
-    .aliases(["m", "generate", "gen", "g"])
-    .description(
-      "Generate resources (routes|controller|model|resources) for an entity"
-    )
+    .command("make <entity>")
+    .aliases(["mk"])
+    .description("Generate all CRUD resources for an entity")
     .option("-f, --force", "Overwrite existing files")
-    .action(async (entity: string, type: ResourceType) => {
+    .option("--table <table>", "Table name (plural form), skips prompt")
+    .option("--route <route>", "Route path (e.g. /todos), skips prompt")
+    .action(async (entity: string, opts: { force?: boolean; table?: string; route?: string }) => {
       try {
         const workingDir = getWorkingDirectory();
 
@@ -39,167 +33,113 @@ export const registerInventCommand = (program: Command): void => {
         if (!projectConfig) {
           console.error(
             chalk.red(
-              "❌ Not in an Kickpress project. Run 'kickpress kick' first."
+              "❌ Not in a Kickpress project. Run 'kickpress init' first."
             )
           );
           process.exit(1);
         }
 
-        // Validate type
-        const validTypes = ["routes", "controller", "model", "resources"];
-
-        if (!validTypes.includes(type)) {
-          console.error(
-            chalk.red(
-              `❌ Invalid type '${type}'. Valid types: ${validTypes.join(", ")}`
-            )
-          );
-          process.exit(1);
-        }
-
-        // Prompt for table name (for proper pluralization)
-        const tableName = await input({
+        // Resolve table name — prompt only if not provided via flag
+        const tableName = opts.table ?? await input({
           message: "What should the table name be? (plural form)",
-          default: `${entity}`,
+          default: `${entity}s`,
           validate: (value) => {
-            if (!value.trim()) {
-              return "Table name cannot be empty";
-            }
+            if (!value.trim()) return "Table name cannot be empty";
             return true;
           },
         });
 
-        // Prompt for route path
-        const routePath = await input({
+        // Resolve route path — prompt only if not provided via flag
+        const routePath = opts.route ?? await input({
           message: "What should the route path be?",
           default: `/${tableName}`,
           validate: (value) => {
-            if (!value.startsWith("/")) {
-              return "Route path must start with /";
-            }
+            if (!value.startsWith("/")) return "Route path must start with /";
             return true;
           },
         });
 
         const entityCapitalized = capitalizeFirst(entity);
 
-        console.log(chalk.blue(`\n☕ Generating ${type} for '${entity}'...\n`));
+        console.log(chalk.blue(`\n☕ Generating resources for '${entity}'...\n`));
 
-        const generateAll = type === "resources";
+        console.log(chalk.gray("📝 Creating model..."));
+        await generateModel(
+          workingDir,
+          entity,
+          entityCapitalized,
+          projectConfig
+        );
 
-        // Generate files based on type
-        if (generateAll || type === "model") {
-          console.log(chalk.gray("📝 Creating model..."));
-          await generateModel(
-            workingDir,
-            entity,
-            entityCapitalized,
-            projectConfig
-          );
+        console.log(chalk.gray("📝 Updating Prisma schema..."));
+        await updatePrismaSchema(workingDir, entityCapitalized);
 
-          console.log(chalk.gray("📝 Updating Prisma schema..."));
-          await updatePrismaSchema(workingDir, entityCapitalized);
+        console.log(chalk.gray("📝 Creating types..."));
+        await generateTypes(
+          workingDir,
+          entity,
+          entityCapitalized,
+          projectConfig
+        );
 
-          console.log(chalk.gray("📝 Creating types..."));
-          await generateTypes(
-            workingDir,
-            entity,
-            entityCapitalized,
-            projectConfig
-          );
-        }
+        console.log(chalk.gray("📝 Creating service..."));
+        await generateService(
+          workingDir,
+          entity,
+          entityCapitalized,
+          projectConfig
+        );
 
-        if (generateAll || type === "controller") {
-          console.log(chalk.gray("📝 Creating controller..."));
-          await generateController(
-            workingDir,
-            entity,
-            entityCapitalized,
-            tableName,
-            projectConfig
-          );
-        }
+        console.log(chalk.gray("📝 Creating controller..."));
+        await generateController(
+          workingDir,
+          entity,
+          entityCapitalized,
+          tableName,
+          projectConfig
+        );
 
-        if (generateAll || type === "validation") {
-          console.log(chalk.gray("📝 Creating validations..."));
-          await generateValidations(workingDir, entity, projectConfig);
-        }
+        console.log(chalk.gray("📝 Creating validations..."));
+        await generateValidations(workingDir, entity, projectConfig);
 
-        if (generateAll || type === "routes") {
-          console.log(chalk.gray("📝 Creating routes..."));
-          await generateRoutes(workingDir, entity, projectConfig);
+        console.log(chalk.gray("📝 Creating routes..."));
+        await generateRoutes(workingDir, entity, projectConfig);
 
-          console.log(chalk.gray("📝 Updating index file..."));
-          await injectRouteIntoIndex(
-            workingDir,
-            entity,
-            routePath,
-            projectConfig
-          );
-        }
+        console.log(chalk.gray("📝 Updating index file..."));
+        await injectRouteIntoIndex(
+          workingDir,
+          entity,
+          routePath,
+          projectConfig
+        );
 
-        if (generateAll) {
-          console.log(chalk.gray("📝 Creating HTTP requests..."));
-          await generateHttpRequests(workingDir, entity, tableName, routePath);
-        }
+        console.log(chalk.gray("📝 Creating HTTP requests..."));
+        await generateHttpRequests(workingDir, entity, tableName, routePath);
 
         console.log(chalk.green("\n✅ Resources generated successfully!\n"));
 
-        if (generateAll || type === "model") {
-          console.log(chalk.blue("\n📦 Running Prisma generate...\n"));
+        if (projectConfig.hasDatabase) {
+          const pm = projectConfig.packageManager;
+          const run = (cmd: string) =>
+            pm === "npm" ? `${pm} run ${cmd}` : `${pm} ${cmd}`;
 
-          execSync(
-            `${
-              projectConfig.packageManager === "npm"
-                ? `${projectConfig.packageManager} run db:generate`
-                : `${projectConfig.packageManager} db:generate`
-            }`,
-            {
-              cwd: workingDir,
-              stdio: "inherit",
-            }
-          );
+          console.log(chalk.blue("\n📦 Running Prisma generate...\n"));
+          execSync(run("db:generate"), { cwd: workingDir, stdio: "inherit" });
 
           console.log(chalk.blue("\n📦 Running Prisma push...\n"));
-          execSync(
-            `${
-              projectConfig.packageManager === "npm"
-                ? `${projectConfig.packageManager} run db:push`
-                : `${projectConfig.packageManager} db:push`
-            }`,
-            {
-              cwd: workingDir,
-              stdio: "inherit",
-            }
-          );
+          execSync(run("db:push"), { cwd: workingDir, stdio: "inherit" });
 
           console.log(chalk.green("\n✅ Database updated successfully!\n"));
-        }
 
-        console.log(chalk.cyan("⚠️  Next steps:"));
-        console.log(
-          chalk.gray(
-            `  1. Add fields to ${entityCapitalized} model in prisma/schema.prisma`
-          )
-        );
-        console.log(
-          chalk.gray(
-            `  2. Run: ${
-              projectConfig.packageManager === "npm"
-                ? `${projectConfig.packageManager} run db:generate`
-                : `${projectConfig.packageManager} db:generate`
-            }`
-          )
-        );
-        console.log(
-          chalk.gray(
-            `  3. Run: ${
-              projectConfig.packageManager === "npm"
-                ? `${projectConfig.packageManager} run db:push`
-                : `${projectConfig.packageManager} db:push`
-            }`
-          )
-        );
+          console.log(chalk.cyan("⚠️  Next steps:"));
+          console.log(
+            chalk.gray(
+              `  1. Add fields to ${entityCapitalized} model in prisma/schema.prisma`
+            )
+          );
+          console.log(chalk.gray(`  2. Run: ${run("db:generate")}`));
+          console.log(chalk.gray(`  3. Run: ${run("db:push")}`));
+        }
       } catch (error) {
         console.error(
           chalk.red(

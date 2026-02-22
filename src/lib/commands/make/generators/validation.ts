@@ -32,15 +32,11 @@ import { z } from "zod";
 
 // Validation schemas
 const ${entity}CreateSchema = z.object({
-  // Add your custom fields here
-  // Example fields based on common use cases:
-  // field: z.string().min(1).max(100).trim(),
+  // Add your fields here after extending the Prisma model
 });
 
 const ${entity}UpdateSchema = z.object({
-  // Add your custom fields here (make them optional)
-  // Example:
-  // field: z.string().min(1).max(100).trim().optional(),
+  // Add your fields here (make them optional)
 });
 
 const idParamSchema = z.object({
@@ -104,15 +100,11 @@ const generateJavaScriptValidations = (entity: string): string => {
 
 // Validation schemas
 const ${entity}CreateSchema = z.object({
-  // Add your custom fields here
-  // Example fields based on common use cases:
-  // field: z.string().min(1).max(100).trim(),
+  // Add your fields here after extending the Prisma model
 });
 
 const ${entity}UpdateSchema = z.object({
-  // Add your custom fields here (make them optional)
-  // Example:
-  // field: z.string().min(1).max(100).trim().optional(),
+  // Add your fields here (make them optional)
 });
 
 const idParamSchema = z.object({

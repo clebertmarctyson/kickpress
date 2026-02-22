@@ -1,5 +1,4 @@
 import { input, select, confirm } from "@inquirer/prompts";
-
 import { detectProjectConfig } from "@/lib/commands/make/detect.js";
 
 import { Database } from "@/lib/types/index.js";
@@ -38,21 +37,47 @@ export const promptForTypeScript = async (): Promise<boolean> => {
 export const promptForTemplate = async (): Promise<string> => {
   return await select({
     message: "Which template would you like to use?",
-    default: "default",
     choices: [
-      { name: "Default (REST API)", value: "default" },
-      { name: "API Only", value: "api" },
-      { name: "Full Stack", value: "fullstack" },
+      {
+        name: "REST API",
+        value: "api",
+        description:
+          "Express + Prisma · controllers, models, routes, services, validations",
+      },
+      {
+        name: "NPM Package",
+        value: "npm",
+        description:
+          "Publishable library · src/index.ts, build setup, .npmignore",
+      },
+      {
+        name: "Node CLI",
+        value: "cli",
+        description:
+          "Commander-based CLI tool · src/cli.ts, src/commands/, bin entry",
+      },
+      {
+        name: "Web App",
+        value: "web",
+        description:
+          "Express server with HTML/CSS/JS frontend · public/index.html, public/styles.css",
+      },
     ],
   });
 };
 
 export const promptForDatabase = async (): Promise<Database> => {
+  const wantDb = await confirm({
+    message: "Would you like to use a database?",
+    default: false,
+  });
+
+  if (!wantDb) return Database.None;
+
   return await select({
     message: "Which database would you like to use?",
-    default: Database.SQLite,
     choices: [
-      { name: "SQLite (default)", value: Database.SQLite },
+      { name: "SQLite", value: Database.SQLite },
       { name: "PostgreSQL", value: Database.PostgreSQL },
     ],
   });
