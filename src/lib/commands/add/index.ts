@@ -171,17 +171,12 @@ export const registerAddCommand = (program: Command): void => {
         console.log(chalk.blue("\n📦 Running Prisma generate...\n"));
         execSync(run("db:generate"), { cwd: workingDir, stdio: "inherit" });
 
-        console.log(chalk.blue("\n📦 Running Prisma push...\n"));
-        execSync(run("db:push"), { cwd: workingDir, stdio: "inherit" });
-
-        console.log(chalk.green("\n✅ Database added successfully!\n"));
-
-        if (db === Database.PostgreSQL) {
-          console.log(
-            chalk.yellow(
-              "🚨 Update DATABASE_URL in .env with your PostgreSQL connection string\n"
-            )
-          );
+        if (db === Database.SQLite) {
+          console.log(chalk.blue("\n📦 Running Prisma push...\n"));
+          execSync(run("db:push"), { cwd: workingDir, stdio: "inherit" });
+          console.log(chalk.green("\n✅ Database added successfully!\n"));
+        } else {
+          console.log(chalk.green("\n✅ Prisma client generated!\n"));
         }
 
         if (pm === "pnpm" && db === Database.SQLite) {
@@ -194,9 +189,16 @@ export const registerAddCommand = (program: Command): void => {
 
         console.log(chalk.cyan("Next steps:"));
         console.log(chalk.gray("  1. Add models to prisma/schema.prisma"));
-        console.log(chalk.gray(`  2. Run: ${run("db:generate")}`));
-        console.log(chalk.gray(`  3. Run: ${run("db:push")}`));
-        console.log(chalk.gray("  4. Run: kickpress make <entity>"));
+
+        if (db === Database.PostgreSQL) {
+          console.log(chalk.gray("  2. Set DATABASE_URL in .env to your PostgreSQL connection string"));
+          console.log(chalk.gray(`  3. Run: ${run("db:push")}`));
+          console.log(chalk.gray("  4. Run: kickpress make <entity>"));
+        } else {
+          console.log(chalk.gray(`  2. Run: ${run("db:generate")}`));
+          console.log(chalk.gray(`  3. Run: ${run("db:push")}`));
+          console.log(chalk.gray("  4. Run: kickpress make <entity>"));
+        }
       } catch (error) {
         console.error(
           chalk.red(`\n❌ Error adding database: ${(error as Error).message}\n`)

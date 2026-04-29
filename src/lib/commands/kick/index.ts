@@ -18,6 +18,12 @@ import {
 import { resolveProjectPath } from "@/lib/utils/paths.js";
 
 import { Database, FreshOptions } from "@/lib/types/index.js";
+import {
+  promptForStarter,
+  applyTodoStarter,
+  applyMathNpmStarter,
+  applyMathCliStarter,
+} from "@/lib/commands/kick/starters.js";
 
 export const registerFreshCommand = (program: Command): void => {
   program
@@ -54,16 +60,22 @@ export const registerFreshCommand = (program: Command): void => {
         // Resolve template (prompt if not provided via flag)
         const template = options.template || (useDefaults ? "api" : await promptForTemplate());
 
+        // Prompt for starter (interactive only — -y always uses blank)
+        const starter = useDefaults ? "blank" : await promptForStarter(template);
+
         // Prompt for TypeScript if not specified
         const useTypeScript =
           options.typescript !== undefined
             ? options.typescript
             : useDefaults ? true : await promptForTypeScript();
 
-        // Determine database — npm and cli templates never need one
+        // Determine database — npm packages never need one; CLI tools can optionally use one
+        // Todo starter always uses SQLite (can't db:push PostgreSQL without a live connection)
         let database: Database;
-        if (template === "npm" || template === "cli") {
+        if (template === "npm") {
           database = Database.None;
+        } else if (starter === "todo") {
+          database = Database.SQLite;
         } else if (options.database) {
           if (!Object.values(Database).includes(options.database as Database)) {
             console.error(
@@ -73,7 +85,7 @@ export const registerFreshCommand = (program: Command): void => {
           }
           database = options.database as Database;
         } else {
-          // --y default: sqlite for api/web (needs DB), none otherwise
+          // --y default: sqlite for api/web, none for cli
           database = useDefaults
             ? (template === "api" || template === "web" ? Database.SQLite : Database.None)
             : await promptForDatabase();
@@ -110,6 +122,18 @@ export const registerFreshCommand = (program: Command): void => {
           packageManager,
         );
 
+        // Apply starter content (writes entity files, overrides schema/validation/types)
+        if (starter === "todo" && (template === "api" || template === "web")) {
+          console.log(chalk.gray("🚀 Applying Todo starter..."));
+          await applyTodoStarter(projectPath, useTypeScript, packageManager, template);
+        } else if (starter === "math" && template === "npm") {
+          console.log(chalk.gray("🚀 Applying Math library starter..."));
+          applyMathNpmStarter(projectPath, useTypeScript, projectName);
+        } else if (starter === "math" && template === "cli") {
+          console.log(chalk.gray("🚀 Applying Math CLI starter..."));
+          applyMathCliStarter(projectPath, useTypeScript, projectName);
+        }
+
         console.log(chalk.blue("\n📦 Installing dependencies...\n"));
 
         const installCmd = `${packageManager} install`;
@@ -127,44 +151,49 @@ export const registerFreshCommand = (program: Command): void => {
               ? `${packageManager} run db:generate`
               : `${packageManager} db:generate`;
 
-          const pushCmd =
-            packageManager === "npm"
-              ? `${packageManager} run db:push`
-              : `${packageManager} db:push`;
-
           execSync(generateCmd, {
             cwd: projectPath,
             stdio: "inherit",
           });
 
-          execSync(pushCmd, {
-            cwd: projectPath,
-            stdio: "inherit",
-          });
+          if (database === Database.SQLite) {
+            const pushCmd =
+              packageManager === "npm"
+                ? `${packageManager} run db:push`
+                : `${packageManager} db:push`;
 
-          console.log(chalk.green("\n✅ Database initialized!\n"));
+            execSync(pushCmd, {
+              cwd: projectPath,
+              stdio: "inherit",
+            });
+
+            console.log(chalk.green("\n✅ Database initialized!\n"));
+          } else {
+            console.log(chalk.green("\n✅ Prisma client generated!\n"));
+          }
         }
 
         console.log(chalk.green(`\n✅ Project created successfully!\n`));
 
+        const devCmd =
+          packageManager === "npm"
+            ? `${packageManager} run dev`
+            : `${packageManager} dev`;
+
+        const pushCmd =
+          packageManager === "npm"
+            ? `${packageManager} run db:push`
+            : `${packageManager} db:push`;
+
         console.log(chalk.cyan("Next steps:"));
-
-        console.log(chalk.gray(`cd ${projectName}`));
-
-        console.log(
-          chalk.gray(
-            packageManager === "npm"
-              ? `${packageManager} run dev`
-              : `${packageManager} dev`,
-          ),
-        );
+        console.log(chalk.gray(`  cd ${projectName}`));
 
         if (database === Database.PostgreSQL) {
-          console.log(
-            chalk.yellow(
-              `🚨 Update DATABASE_URL in .env file with your PostgreSQL connection string\n`,
-            ),
-          );
+          console.log(chalk.gray(`  1. Set DATABASE_URL in .env to your PostgreSQL connection string`));
+          console.log(chalk.gray(`  2. Run: ${pushCmd}`));
+          console.log(chalk.gray(`  3. Run: ${devCmd}`));
+        } else {
+          console.log(chalk.gray(`  ${devCmd}`));
         }
       } catch (error) {
         console.error(

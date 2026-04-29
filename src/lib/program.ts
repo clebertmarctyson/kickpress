@@ -6,6 +6,7 @@ import {
   registerFreshCommand,
   registerInventCommand,
   registerAddCommand,
+  registerSwitchCommand,
 } from "@/lib/commands/index.js";
 
 const packageJson = getPackageJson();
@@ -53,6 +54,11 @@ Examples:
   $ npx kickpress add db sqlite
   $ npx kickpress add db postgresql
 
+  # Switch database provider (schema + config only, data migration is manual)
+  $ npx kickpress switch db
+  $ npx kickpress switch db sqlite
+  $ npx kickpress switch db postgresql
+
 Quick Start:
   1. $ npx kickpress init my-api -y
   2. $ cd my-api
@@ -62,7 +68,8 @@ Quick Start:
 Features:
   ✓ Templates: REST API, NPM package, CLI tool, Web app
   ✓ TypeScript first (JavaScript optional)
-  ✓ Database optional — SQLite or PostgreSQL via Prisma
+  ✓ Database optional — SQLite or PostgreSQL via Prisma (CLI tools too)
+  ✓ Switch database provider without losing your schema
   ✓ Full CRUD generation with type safety
   ✓ Service layer generation
   ✓ Auto-injection of routes into index
@@ -79,6 +86,7 @@ Learn more:
 registerFreshCommand(program);
 registerInventCommand(program);
 registerAddCommand(program);
+registerSwitchCommand(program);
 
 program.on("command:*", (operands) => {
   console.error(`❌ Unknown command: ${operands[0]}`);

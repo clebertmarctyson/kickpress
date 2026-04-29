@@ -94,14 +94,30 @@ export const generatePackageJson = (config: ProjectConfig): object => {
 
   if (template === "cli") {
     dependencies.commander = "^14.0.0";
+    const envFlag = database !== Database.None ? " --env-file=.env" : "";
     if (typescript) {
       devDependencies.tsx = "^4.21.0";
-      scripts.dev = "tsx watch src/cli.ts";
+      scripts.dev = `tsx watch${envFlag} src/cli.ts`;
       scripts.build = "tsc";
       scripts.start = "node dist/cli.js";
     } else {
-      scripts.dev = "node --watch src/cli.js";
+      scripts.dev = `node --watch${envFlag} src/cli.js`;
       scripts.start = "node src/cli.js";
+    }
+    if (database !== Database.None) {
+      if (database === Database.SQLite) {
+        dependencies["better-sqlite3"] = "^12.6.2";
+        dependencies["@prisma/adapter-better-sqlite3"] = "^7.4.1";
+        devDependencies["@types/better-sqlite3"] = "^7.6.13";
+      } else if (database === Database.PostgreSQL) {
+        dependencies["@prisma/adapter-pg"] = "^7.4.1";
+      }
+      dependencies["@prisma/client"] = "^7.4.1";
+      devDependencies.prisma = "^7.4.1";
+      scripts["db:generate"] = "prisma generate";
+      scripts["db:push"] = "prisma db push";
+      scripts["db:migrate"] = "prisma migrate dev";
+      scripts["db:studio"] = "prisma studio";
     }
   } else {
     // api / web — Express-based
@@ -900,7 +916,21 @@ program
 program.parse();
 `;
     writeFileSync(join(projectPath, "src", `cli.${extension}`), cliContent);
-    return; // no .env, no Prisma
+
+    if (database === Database.None) {
+      return;
+    }
+
+    // CLI with database: write .env and Prisma files
+    const dbUrl =
+      database === Database.SQLite
+        ? "file:./dev.db"
+        : "postgresql://user:password@host:port/database?schema=public";
+    writeFileSync(join(projectPath, ".env"), generateEnvFile(dbUrl));
+    writeFileSync(join(projectPath, "prisma.config.ts"), generatePrismaConfig());
+    writeFileSync(join(projectPath, "prisma", "schema.prisma"), generatePrismaSchema(database));
+    writeFileSync(join(projectPath, "src", "lib", `prisma.${extension}`), generatePrismaClient(typescript, database));
+    return;
   }
 
   // ── EXPRESS-BASED (api / web) ─────────────────────────────────────────────

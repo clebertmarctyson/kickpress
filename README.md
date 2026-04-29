@@ -1,0 +1,790 @@
+# ☕ Kickpress CLI
+
+> A fast and opinionated CLI for scaffolding Express.js projects with TypeScript, Prisma, and security-first best practices built-in.
+
+Kickpress helps you create production-ready Express.js APIs in seconds, with full CRUD generation, input validation, type safety, and modern tooling.
+
+[![npm version](https://img.shields.io/npm/v/kickpress.svg)](https://www.npmjs.com/package/kickpress)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+## Table of Contents
+
+- [✨ Features](#-features)
+- [⚡ Why Kickpress?](#-why-kickpress)
+- [📋 Requirements](#-requirements)
+- [🚀 Quick Start](#-quick-start)
+- [📦 Installation](#-installation)
+- [🎨 Templates & Starters](#-templates--starters)
+- [📖 Command Reference](#-command-reference)
+  - [`init` - Create a New Project](#init---create-a-new-project)
+  - [`make` - Generate Resources](#make---generate-resources)
+  - [`add db` - Add Database to Existing Project](#add-db---add-database-to-existing-project)
+  - [`switch db` - Switch Database Provider](#switch-db---switch-database-provider)
+- [📋 Complete Workflow Example](#-complete-workflow-example)
+- [📁 Generated Project Structure](#-generated-project-structure)
+- [🎨 Generated Code Examples](#-generated-code-examples)
+- [🔒 Security & Validation](#-security--validation)
+- [🔧 Available Scripts](#-available-scripts)
+- [🛠️ Technology Stack](#️-technology-stack)
+- [🗄️ Database Support](#️-database-support)
+- [🧪 Testing Your API](#-testing-your-api)
+- [🐛 Troubleshooting](#-troubleshooting)
+- [❓ FAQ](#-faq)
+- [🤝 Contributing](#-contributing)
+- [👤 Author](#-author)
+- [📄 License](#-license)
+- [💬 Support](#-support)
+
+## ✨ Features
+
+- 🚀 **Instant Setup** - Create a complete project in seconds with auto-installation
+- 🎨 **Multiple Templates** - REST API, NPM package, CLI tool, or static Web app
+- ⚡ **Starter Content** - Blank or pre-built starter (Todo API, Math library, Math CLI)
+- 🔒 **Security First** - Built-in input validation with Zod on all endpoints
+- 📦 **TypeScript First** - Full TypeScript support with proper types (JavaScript optional)
+- 🗄️ **Optional Database** - SQLite or PostgreSQL via Prisma — available for API, Web, and CLI templates
+- 🎯 **CRUD Generation** - Generate the full stack for any entity in one command
+- 🔄 **Auto-injection** - Routes automatically added to your app
+- ➕ **Add Database Later** - Add Prisma to any existing project with `kickpress add db`
+- 🔀 **Switch Database** - Switch between SQLite and PostgreSQL with `kickpress switch db`
+- ⚡ **Modern Stack** - Express, Prisma, Zod, tsx, and express-async-handler
+- 🛡️ **Error Handling** - Comprehensive error middleware included
+- 📝 **HTTP Requests** - Test files generated for each resource
+- ⚙️ **Zero Configuration** - Everything works out of the box
+
+## ⚡ Why Kickpress?
+
+| Task                   | Manual Setup       | With Kickpress  |
+| ---------------------- | ------------------ | --------------- |
+| Project Setup          | 15-30 minutes      | 30 seconds      |
+| Prisma Configuration   | Manual config      | Auto-configured |
+| Input Validation       | Write from scratch | Auto-generated  |
+| CRUD Generation        | Write from scratch | 1 command       |
+| Error Handling         | Custom impl        | Built-in        |
+| Type Safety            | Manual types       | Auto-generated  |
+| Route Registration     | Manual import      | Auto-injected   |
+| Add DB Later           | Manual wiring      | 1 command       |
+| Switch DB Provider     | Manual refactor    | 1 command       |
+
+## 📋 Requirements
+
+- **Node.js**: v20.0.0 or higher (for `--env-file` support)
+- **Package Manager**: npm, pnpm, or yarn
+- **Operating System**: macOS, Linux, or Windows
+- **PostgreSQL**: Required only if using the PostgreSQL database option
+
+> **Note**: Kickpress uses Node.js native `--env-file` flag. For Node.js < v20, you may need additional configuration.
+
+## 🚀 Quick Start
+
+```bash
+# Interactive (recommended for first-time users)
+npx kickpress init
+
+# One-liner with all defaults (TypeScript, API template, SQLite, pnpm)
+npx kickpress init my-api -y
+
+# Navigate and start
+cd my-api
+pnpm dev
+```
+
+Your API is now running at `http://localhost:3000`! 🎉
+
+## 📦 Installation
+
+No installation required — use `npx` to run directly:
+
+```bash
+npx kickpress init my-project
+```
+
+Or install globally:
+
+```bash
+npm install -g kickpress
+kickpress init my-project
+```
+
+## 🎨 Templates & Starters
+
+Choose a template with `-t`. When running interactively (without `-y`), you will also be asked to pick a **starter** — a pre-built starting point for that template.
+
+### Templates
+
+| Template | Description                                          | Database |
+| -------- | ---------------------------------------------------- | -------- |
+| `api`    | REST API with Express, Prisma, Zod, and CRUD helpers | Optional |
+| `npm`    | Publishable NPM package with TypeScript declarations | None     |
+| `cli`    | Command-line tool with Commander.js                  | Optional |
+| `web`    | Static HTML/CSS/JS web app with Express              | Optional |
+
+```bash
+npx kickpress init my-api  -t api
+npx kickpress init my-lib  -t npm
+npx kickpress init my-tool -t cli
+npx kickpress init my-site -t web
+```
+
+### Starters
+
+When you run `kickpress init` interactively, you'll be asked which starter to use:
+
+| Template | Blank | Starter |
+| -------- | ----- | ------- |
+| `api`    | Empty project — add resources with `kickpress make` | **Todo** — complete CRUD API with `title`, `completed` fields, SQLite, ready to run |
+| `web`    | Empty project | **Todo** — Todo API + working HTML/CSS/JS frontend |
+| `npm`    | `hello()` export | **Math library** — `sum`, `subtract`, `multiply`, `divide` with error handling |
+| `cli`    | `hello` command | **Math CLI** — `add 2 4 → 8`, `subtract`, `multiply`, `divide` commands |
+
+> **Note**: The Todo starter forces SQLite — no connection string needed. The `-y` flag always uses blank.
+
+## 📖 Command Reference
+
+### `init` - Create a New Project
+
+Creates a complete project with all dependencies and folder structure.
+
+**Syntax:**
+
+```bash
+kickpress init [project-name] [options]
+```
+
+**Alias:** `in`
+
+**Arguments:**
+
+- `project-name` — Name of your project (optional, will prompt if not provided)
+
+**Options:**
+
+| Flag                           | Description                                             |
+| ------------------------------ | ------------------------------------------------------- |
+| `-t, --template <template>`    | Template: `api` \| `npm` \| `cli` \| `web`             |
+| `-d, --database <database>`    | Database: `sqlite` \| `postgresql` \| `none`           |
+| `--typescript`                 | Use TypeScript                                          |
+| `--no-typescript`              | Use JavaScript instead                                  |
+| `-p, --package-manager <pm>`   | Package manager: `pnpm` \| `npm` \| `yarn`            |
+| `-y, --yes`                    | Accept all defaults (TypeScript, api, sqlite, pnpm, blank starter) |
+
+**Examples:**
+
+```bash
+# Interactive (prompts for template, starter, TypeScript, database, package manager)
+npx kickpress init
+npx kickpress init my-api
+
+# Accept all defaults — no prompts, blank starter
+npx kickpress init my-api -y
+npx kickpress in  my-api -y
+
+# API with SQLite
+npx kickpress init my-api -t api -d sqlite
+
+# API with PostgreSQL (db:push shown as next step — run after setting DATABASE_URL)
+npx kickpress init my-api -t api -d postgresql
+
+# API with no database
+npx kickpress init my-api -t api -d none
+
+# CLI tool with SQLite database
+npx kickpress init my-tool -t cli -d sqlite
+
+# NPM package (no database)
+npx kickpress init my-lib -t npm
+
+# JavaScript project
+npx kickpress init my-api --no-typescript -t api -d sqlite
+```
+
+**What it does automatically:**
+
+- ✅ Creates complete folder structure
+- ✅ Generates all configuration files
+- ✅ Installs all dependencies
+- ✅ Applies selected starter content
+- ✅ Generates Prisma Client and pushes schema (SQLite only — PostgreSQL shows next steps)
+- ✅ Sets up error handling middleware
+- ✅ Configures TypeScript/JavaScript
+
+---
+
+### `make` - Generate Resources
+
+Generates the full CRUD stack for any entity — model, service, controller, validation, routes, and HTTP test file — all wired together and injected into `src/index.*`.
+
+**Syntax:**
+
+```bash
+kickpress make <entity> [options]
+```
+
+**Alias:** `mk`
+
+**Arguments:**
+
+- `entity` — Name of the entity (singular, e.g., `user`, `post`, `product`)
+
+**Options:**
+
+| Flag              | Description                                           |
+| ----------------- | ----------------------------------------------------- |
+| `--table <name>`  | Table name (plural), skips interactive prompt         |
+| `--route <path>`  | Route path (e.g. `/todos`), skips prompt              |
+| `-f, --force`     | Overwrite existing files                              |
+
+**Examples:**
+
+```bash
+# Interactive (prompts for table name and route path)
+npx kickpress make user
+npx kickpress make post
+
+# Non-interactive (useful in scripts/CI)
+npx kickpress make todo --table todos --route /todos
+npx kickpress mk   post --table posts --route /posts
+```
+
+**What it generates:**
+
+| File                              | Description                                     |
+| --------------------------------- | ----------------------------------------------- |
+| `prisma/schema.prisma`            | Updated with new model stub                     |
+| `types/entity.d.ts`               | TypeScript interfaces (TS only)                 |
+| `models/entity.model.*`           | Raw Prisma database operations                  |
+| `services/entity.service.*`       | Business logic wrapping the model               |
+| `controllers/entity.controller.*` | HTTP handlers calling the service               |
+| `validations/entity.validation.*` | Zod schemas and validation middleware           |
+| `routes/entity.routes.*`          | Express routes wired to controller + validation |
+| `requests/entity.http`            | HTTP test file for all endpoints                |
+
+Routes are also **auto-injected** into `src/index.*`.
+
+**Architecture flow:**
+
+```
+Request → Routes → Validation → Controller → Service → Model → Prisma → DB
+```
+
+---
+
+### `add db` - Add Database to Existing Project
+
+Wires Prisma into a project that was initially created without a database. Works for **API, Web, and CLI** projects.
+
+**Syntax:**
+
+```bash
+kickpress add db [database]
+```
+
+**Arguments:**
+
+- `database` — `sqlite` or `postgresql` (optional, will prompt if not provided)
+
+**Examples:**
+
+```bash
+# Interactive prompt
+npx kickpress add db
+
+# Non-interactive
+npx kickpress add db sqlite
+npx kickpress add db postgresql
+```
+
+**What it does:**
+
+- ✅ Installs `@prisma/client`, `prisma`, and the correct database adapter
+- ✅ Creates `prisma/schema.prisma` and `prisma.config.ts`
+- ✅ Creates `src/lib/prisma.ts` (typed Prisma client)
+- ✅ Patches `error.middleware.*` to handle Prisma error codes (`P2002`, `P2025`) — API/Web only
+- ✅ Appends `DATABASE_URL` to `.env`
+- ✅ Appends Prisma entries to `.gitignore`
+- ✅ Adds `db:generate`, `db:push`, `db:migrate`, `db:studio` scripts to `package.json`
+- ✅ Runs `db:generate` and `db:push` automatically (SQLite only)
+- ✅ For PostgreSQL: runs `db:generate`, then shows next steps to set `DATABASE_URL` and run `db:push`
+
+> **Note:** This command is safe to run on any Kickpress project (API, Web, or CLI). It will exit early if a database is already configured.
+
+---
+
+### `switch db` - Switch Database Provider
+
+Switches your project between SQLite and PostgreSQL. Updates all configuration — packages, schema provider, `.env`, and the Prisma client file — without touching your schema models.
+
+**Syntax:**
+
+```bash
+kickpress switch db [database]
+```
+
+**Arguments:**
+
+- `database` — `sqlite` or `postgresql` (optional, will prompt if not provided)
+
+**Examples:**
+
+```bash
+# Interactive prompt (shows current provider, lets you pick the target)
+npx kickpress switch db
+
+# Non-interactive
+npx kickpress switch db postgresql
+npx kickpress switch db sqlite
+```
+
+**What it does:**
+
+- ✅ Uninstalls the current database adapter
+- ✅ Installs the new database adapter
+- ✅ Updates `provider` in `prisma/schema.prisma`
+- ✅ Updates `DATABASE_URL` in `.env`
+- ✅ Regenerates `src/lib/prisma.*` with the correct adapter
+- ✅ Runs `db:generate`
+- ✅ Runs `db:push` automatically when switching **to SQLite**
+- ✅ Shows next steps when switching **to PostgreSQL** (requires a live connection first)
+
+> ⚠️ **Data migration is manual.** `switch db` only switches the schema and configuration. Your existing data is not transferred. Back up your data before switching.
+
+**Next steps after switching to PostgreSQL:**
+
+```bash
+# 1. Update your connection string in .env
+DATABASE_URL="postgresql://USER:PASSWORD@HOST:PORT/DATABASE?schema=public"
+
+# 2. Push the schema to your PostgreSQL database
+pnpm db:push
+
+# 3. Migrate your data manually
+```
+
+## 📋 Complete Workflow Example
+
+### REST API with SQLite (Todo Starter)
+
+**1. Create project interactively:**
+
+```bash
+npx kickpress init my-api
+# Select: REST API → Todo starter → TypeScript → SQLite → pnpm
+cd my-api
+pnpm approve-builds  # select better-sqlite3 (pnpm only)
+pnpm dev
+```
+
+> The Todo starter generates a complete, working `/todos` CRUD API — ready to run with no edits.
+
+**2. Test immediately:**
+
+```bash
+curl http://localhost:3000/todos
+curl -X POST http://localhost:3000/todos \
+  -H "Content-Type: application/json" \
+  -d '{"title":"Buy coffee"}'
+```
+
+---
+
+### REST API with SQLite (Blank)
+
+**1. Create project:**
+
+```bash
+npx kickpress init blog-api -t api -d sqlite
+cd blog-api
+```
+
+> **pnpm users:** Run `pnpm approve-builds` and select `better-sqlite3` before starting.
+
+**2. Generate resources:**
+
+```bash
+npx kickpress make post
+# Prompts: table name (e.g. posts), route path (e.g. /posts)
+```
+
+**3. Add fields to your model and validation:**
+
+Edit `prisma/schema.prisma`:
+
+```prisma
+model Post {
+  id        Int      @id @default(autoincrement())
+  title     String
+  content   String
+  author    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+```
+
+Edit `src/validations/post.validation.ts`:
+
+```typescript
+const postCreateSchema = z.object({
+  title: z.string().min(1).max(255),
+  content: z.string().min(1),
+  author: z.string().min(1).max(100),
+});
+```
+
+**4. Push schema and start:**
+
+```bash
+pnpm db:generate
+pnpm db:push
+pnpm dev
+```
+
+---
+
+### REST API with PostgreSQL
+
+```bash
+npx kickpress init blog-api -t api -d postgresql
+cd blog-api
+```
+
+Update `.env`:
+
+```env
+DATABASE_URL="postgresql://postgres:mypassword@localhost:5432/blogdb?schema=public"
+```
+
+```bash
+pnpm db:push
+pnpm dev
+```
+
+---
+
+### CLI Tool with Database
+
+```bash
+# Create with database from the start
+npx kickpress init my-tool -t cli -d sqlite
+cd my-tool
+pnpm approve-builds  # select better-sqlite3 (pnpm only)
+pnpm dev
+
+# Or add a database to an existing CLI project
+npx kickpress add db sqlite
+```
+
+---
+
+### Adding a Database Later
+
+```bash
+npx kickpress init blog-api -t api -d none
+cd blog-api
+# ... develop, change your mind ...
+npx kickpress add db sqlite
+```
+
+---
+
+### Switching Database Provider
+
+```bash
+# Switch from SQLite to PostgreSQL
+npx kickpress switch db postgresql
+# → Update DATABASE_URL in .env, then run: pnpm db:push
+
+# Switch back to SQLite
+npx kickpress switch db sqlite
+# → db:push runs automatically
+```
+
+## 📁 Generated Project Structure
+
+### API template (with database)
+
+```
+my-api/
+├── src/
+│   ├── index.ts                    # Main entry point
+│   ├── lib/
+│   │   └── prisma.ts               # Prisma client
+│   ├── controllers/
+│   ├── models/
+│   ├── services/
+│   ├── routes/
+│   ├── validations/
+│   ├── types/
+│   ├── middlewares/
+│   │   └── error.middleware.ts
+│   ├── config/
+│   └── utils/
+├── prisma/
+│   ├── schema.prisma
+│   └── migrations/
+├── requests/
+├── .env
+├── tsconfig.json
+└── package.json
+```
+
+## 🎨 Generated Code Examples
+
+### Model (`src/models/user.model.ts`)
+
+```typescript
+import prisma from "../lib/prisma";
+import type { User, UserCreateInput, UserUpdateInput } from "../types/user";
+
+const userFindAll = async (): Promise<User[]> => prisma.user.findMany();
+const userFindOne = async (id: number): Promise<User | null> => prisma.user.findUnique({ where: { id } });
+const userCreate = async (data: UserCreateInput): Promise<User> => prisma.user.create({ data });
+const userUpdate = async (id: number, data: UserUpdateInput): Promise<User | null> => prisma.user.update({ where: { id }, data });
+const userDelete = async (id: number): Promise<User | null> => prisma.user.delete({ where: { id } });
+
+export { userFindAll, userFindOne, userCreate, userUpdate, userDelete };
+```
+
+### Controller (`src/controllers/user.controller.ts`)
+
+```typescript
+import { Request, Response } from "express";
+import asyncHandler from "express-async-handler";
+import { getAllUsers, getUser, createUser, updateUser, deleteUser } from "../services/user.service";
+
+const all = asyncHandler(async (_: Request, res: Response) => {
+  res.json(await getAllUsers());
+});
+const findOne = asyncHandler(async (req: Request, res: Response) => {
+  const user = await getUser(Number(req.params.id));
+  if (!user) { res.status(404); throw new Error("User not found"); }
+  res.json(user);
+});
+const create = asyncHandler(async (req: Request, res: Response) => {
+  res.status(201).json(await createUser(req.body));
+});
+const update = asyncHandler(async (req: Request, res: Response) => {
+  const user = await getUser(Number(req.params.id));
+  if (!user) { res.status(404); throw new Error("User not found"); }
+  res.json(await updateUser(user.id, req.body));
+});
+const remove = asyncHandler(async (req: Request, res: Response) => {
+  const user = await getUser(Number(req.params.id));
+  if (!user) { res.status(404); throw new Error("User not found"); }
+  await deleteUser(user.id);
+  res.status(204).send();
+});
+
+export { all, findOne, create, update, remove };
+```
+
+### Validation (`src/validations/user.validation.ts`)
+
+Standard (fill in your fields after extending the Prisma model):
+
+```typescript
+const userCreateSchema = z.object({
+  // Add your fields here after extending the Prisma model
+});
+```
+
+Todo Starter (pre-filled and ready to use):
+
+```typescript
+const todoCreateSchema = z.object({
+  title: z.string().min(1, "Title is required").max(255),
+  completed: z.boolean().optional().default(false),
+});
+
+const todoUpdateSchema = z.object({
+  title: z.string().min(1).max(255).optional(),
+  completed: z.boolean().optional(),
+});
+```
+
+## 🔒 Security & Validation
+
+✅ **SQL Injection Protection** — Prisma uses parameterized queries
+✅ **Input Validation** — Zod validates all request data
+✅ **Type Coercion** — Safe type transformation
+✅ **Error Information Leakage** — Safe error messages in production
+
+## 🔧 Available Scripts
+
+```bash
+pnpm dev          # Start dev server with hot reload
+pnpm build        # Compile TypeScript to JavaScript
+pnpm start        # Start production server
+
+# Database (when configured)
+pnpm db:generate  # Generate Prisma Client
+pnpm db:push      # Push schema to database
+pnpm db:migrate   # Create migration
+pnpm db:studio    # Open Prisma Studio
+```
+
+## 🛠️ Technology Stack
+
+- **Express.js** — Fast, minimalist web framework
+- **TypeScript** — Type-safe JavaScript (optional)
+- **Zod** — TypeScript-first schema validation
+- **Commander.js** — CLI argument parsing (CLI template)
+- **tsx** — TypeScript execution engine
+- **express-async-handler** — Async error handling
+- **Prisma** — Next-generation ORM (optional)
+- **SQLite** — File-based, zero config (with better-sqlite3 adapter)
+- **PostgreSQL** — Production-ready (with @prisma/adapter-pg)
+
+## 🗄️ Database Support
+
+Database is **optional** for `api`, `web`, and `cli` templates and **not available** for the `npm` template.
+
+### SQLite
+
+Zero configuration — Kickpress sets it up automatically and runs `db:push` immediately.
+
+```env
+DATABASE_URL="file:./dev.db"
+```
+
+### PostgreSQL
+
+Kickpress generates all config files and runs `db:generate`, then shows you the next steps to run after configuring your connection string.
+
+```env
+DATABASE_URL="postgresql://USER:PASSWORD@HOST:PORT/DATABASE?schema=public"
+```
+
+Popular hosted options:
+
+```env
+# Neon
+DATABASE_URL="postgresql://user:pass@ep-cool-name.us-east-2.aws.neon.tech/neondb?sslmode=require"
+
+# Supabase
+DATABASE_URL="postgresql://postgres:pass@db.project.supabase.co:5432/postgres?schema=public"
+
+# Railway
+DATABASE_URL="postgresql://postgres:pass@containers-us-west.railway.app:5432/railway?schema=public"
+```
+
+### No Database
+
+```bash
+npx kickpress init my-api -t api -d none
+npx kickpress add db sqlite  # add later
+```
+
+### Switching Between Providers
+
+```bash
+npx kickpress switch db postgresql  # SQLite → PostgreSQL
+npx kickpress switch db sqlite      # PostgreSQL → SQLite
+```
+
+> ⚠️ Schema and config switch automatically. Data migration is manual.
+
+## 🧪 Testing Your API
+
+Each generated resource includes an `.http` file. Use the [REST Client](https://marketplace.visualstudio.com/items?itemName=humao.rest-client) VS Code extension:
+
+1. Open `requests/user.http`
+2. Click "Send Request" above any request
+
+Or use curl:
+
+```bash
+curl http://localhost:3000/users
+curl -X POST http://localhost:3000/users \
+  -H "Content-Type: application/json" \
+  -d '{"name":"John Doe","email":"john@example.com"}'
+```
+
+## 🐛 Troubleshooting
+
+### pnpm: "Cannot find module" errors (SQLite)
+
+```bash
+pnpm approve-builds
+# Select: better-sqlite3 (press space, then enter)
+```
+
+### Prisma Client errors
+
+```bash
+pnpm db:generate
+```
+
+### Port already in use
+
+```env
+PORT=3001
+```
+
+### PostgreSQL connection errors
+
+```bash
+pg_isready
+psql "postgresql://USER:PASSWORD@HOST:PORT/DATABASE"
+```
+
+Common causes: wrong credentials, database doesn't exist, SSL required (`?sslmode=require`).
+
+## ❓ FAQ
+
+**Q: Can I use this in production?**
+A: Yes! Use PostgreSQL for production and add authentication, CORS, and rate limiting as needed.
+
+**Q: What databases are supported?**
+A: SQLite and PostgreSQL. MySQL and MongoDB support planned.
+
+**Q: Can I add a database to a CLI project?**
+A: Yes! Run `npx kickpress add db sqlite` from inside your CLI project.
+
+**Q: Can I switch from SQLite to PostgreSQL later?**
+A: Yes! Run `npx kickpress switch db postgresql`. Your schema models are preserved — only the provider and adapter change. Data migration is manual.
+
+**Q: Why doesn't `db:push` run automatically for PostgreSQL?**
+A: PostgreSQL requires a running server and a valid connection string. Kickpress sets up all config files and generates the client, then shows you the exact commands to run once `DATABASE_URL` is configured.
+
+**Q: What are starters?**
+A: Starters are optional pre-built starting points. Run `kickpress init` interactively to pick one — a full Todo CRUD API for `api`/`web`, or a math library/CLI for `npm`/`cli`. The `-y` flag always uses blank.
+
+**Q: How is this different from NestJS?**
+A: NestJS is a framework. Kickpress generates plain Express.js code with no framework lock-in.
+
+**Q: Can I customize the generated code?**
+A: Absolutely — it's all yours to modify.
+
+## 🤝 Contributing
+
+Contributions are welcome!
+
+1. Fork the repository
+2. Create your feature branch
+3. Make your changes
+4. Submit a pull request
+
+## 👤 Author
+
+**Marc Tyson CLEBERT**
+
+- Website: [marctysonclebert.com](https://www.marctysonclebert.com)
+- GitHub: [@clebertmarctyson](https://github.com/clebertmarctyson)
+- Twitter: [@ClebertTyson](https://x.com/ClebertTyson)
+- Email: [contact@marctysonclebert.com](mailto:contact@marctysonclebert.com)
+
+## 📄 License
+
+MIT © [Marc Tyson CLEBERT](https://www.marctysonclebert.com)
+
+## 💬 Support
+
+- 🐛 [Report Issues](https://github.com/clebertmarctyson/kickpress/issues)
+- 💡 [Request Features](https://github.com/clebertmarctyson/kickpress/issues/new)
+- 📧 Email: [contact@marctysonclebert.com](mailto:contact@marctysonclebert.com)
+- ⭐ [Star on GitHub](https://github.com/clebertmarctyson/kickpress)
+- ☕ [Buy me a coffee](https://www.buymeacoffee.com/marctysonclebert)
+
+---
+
+Made with ☕ and ❤️ by [Marc Tyson CLEBERT](https://www.marctysonclebert.com)

@@ -23,8 +23,8 @@ export const detectProjectConfig = (
 
   const packageJson = JSON.parse(readFileSync(packageJsonPath, "utf-8"));
 
-  // Check if express is a dependency
-  if (!packageJson.dependencies?.express) {
+  // Check if it's a Kickpress project (Express API/web or Commander CLI)
+  if (!packageJson.dependencies?.express && !packageJson.dependencies?.commander) {
     return null;
   }
 
