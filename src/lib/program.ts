@@ -36,6 +36,7 @@ Examples:
   # Templates: api | npm | cli | web
   $ npx kickpress init my-api -t api -d sqlite
   $ npx kickpress init my-api -t api -d postgresql
+  $ npx kickpress init my-api -t api -d mysql
   $ npx kickpress init my-api -t api -d none
   $ npx kickpress init my-lib  -t npm
   $ npx kickpress init my-tool -t cli
@@ -53,11 +54,13 @@ Examples:
   $ npx kickpress add db
   $ npx kickpress add db sqlite
   $ npx kickpress add db postgresql
+  $ npx kickpress add db mysql
 
   # Switch database provider (schema + config only, data migration is manual)
   $ npx kickpress switch db
   $ npx kickpress switch db sqlite
   $ npx kickpress switch db postgresql
+  $ npx kickpress switch db mysql
 
 Quick Start:
   1. $ npx kickpress init my-api -y
@@ -68,7 +71,7 @@ Quick Start:
 Features:
   ✓ Templates: REST API, NPM package, CLI tool, Web app
   ✓ TypeScript first (JavaScript optional)
-  ✓ Database optional — SQLite or PostgreSQL via Prisma (CLI tools too)
+  ✓ Database optional — SQLite, PostgreSQL, or MySQL via Prisma (CLI tools too)
   ✓ Switch database provider without losing your schema
   ✓ Full CRUD generation with type safety
   ✓ Service layer generation

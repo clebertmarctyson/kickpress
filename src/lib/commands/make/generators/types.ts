@@ -1,6 +1,7 @@
 import { writeFileSync, mkdirSync, existsSync } from "fs";
 import { join } from "path";
 import type { ProjectConfig } from "@/lib/commands/make/detect.js";
+import { Database } from "@/lib/types/index.js";
 
 export const generateTypes = async (
   workingDir: string,
@@ -21,8 +22,10 @@ export const generateTypes = async (
 
   const typeFile = join(typesDir, `${entity}.d.ts`);
 
+  const idType = config.database === Database.MongoDB ? "string" : "number";
+
   const content = `export interface ${entityCapitalized} {
-  id: number;
+  id: ${idType};
   createdAt: Date;
   updatedAt: Date;
 }

@@ -79,6 +79,8 @@ export const promptForDatabase = async (): Promise<Database> => {
     choices: [
       { name: "SQLite", value: Database.SQLite },
       { name: "PostgreSQL", value: Database.PostgreSQL },
+      { name: "MySQL", value: Database.MySQL },
+      { name: "MongoDB", value: Database.MongoDB },
     ],
   });
 };

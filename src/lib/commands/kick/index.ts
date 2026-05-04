@@ -31,7 +31,7 @@ export const registerFreshCommand = (program: Command): void => {
     .aliases(["in"])
     .description("Create a new Kickpress project")
     .option("-t, --template <template>", "Template to use (api|npm|cli|web)")
-    .option("-d, --database <database>", "Database to use (sqlite|postgresql|none)")
+    .option("-d, --database <database>", "Database to use (sqlite|postgresql|mysql|none)")
     .option("--typescript", "Use TypeScript")
     .option("--no-typescript", "Use JavaScript")
     .option("-p, --package-manager <package-manager>", "Package manager to use")
@@ -75,11 +75,14 @@ export const registerFreshCommand = (program: Command): void => {
         if (template === "npm") {
           database = Database.None;
         } else if (starter === "todo") {
-          database = Database.SQLite;
+          // Todo starter defaults to SQLite; MongoDB allowed via --database flag
+          database = (options.database as Database) === Database.MongoDB
+            ? Database.MongoDB
+            : Database.SQLite;
         } else if (options.database) {
           if (!Object.values(Database).includes(options.database as Database)) {
             console.error(
-              chalk.red(`❌ Invalid database option: ${options.database}. Valid options: sqlite, postgresql, none`),
+              chalk.red(`❌ Invalid database option: ${options.database}. Valid options: sqlite, postgresql, mysql, mongodb, none`),
             );
             process.exit(1);
           }
@@ -125,7 +128,7 @@ export const registerFreshCommand = (program: Command): void => {
         // Apply starter content (writes entity files, overrides schema/validation/types)
         if (starter === "todo" && (template === "api" || template === "web")) {
           console.log(chalk.gray("🚀 Applying Todo starter..."));
-          await applyTodoStarter(projectPath, useTypeScript, packageManager, template);
+          await applyTodoStarter(projectPath, useTypeScript, packageManager, template, database);
         } else if (starter === "math" && template === "npm") {
           console.log(chalk.gray("🚀 Applying Math library starter..."));
           applyMathNpmStarter(projectPath, useTypeScript, projectName);
@@ -156,7 +159,7 @@ export const registerFreshCommand = (program: Command): void => {
             stdio: "inherit",
           });
 
-          if (database === Database.SQLite) {
+          if (database === Database.SQLite || database === Database.MongoDB) {
             const pushCmd =
               packageManager === "npm"
                 ? `${packageManager} run db:push`
@@ -190,6 +193,14 @@ export const registerFreshCommand = (program: Command): void => {
 
         if (database === Database.PostgreSQL) {
           console.log(chalk.gray(`  1. Set DATABASE_URL in .env to your PostgreSQL connection string`));
+          console.log(chalk.gray(`  2. Run: ${pushCmd}`));
+          console.log(chalk.gray(`  3. Run: ${devCmd}`));
+        } else if (database === Database.MySQL) {
+          console.log(chalk.gray(`  1. Set DATABASE_URL in .env to your MySQL connection string`));
+          console.log(chalk.gray(`  2. Run: ${pushCmd}`));
+          console.log(chalk.gray(`  3. Run: ${devCmd}`));
+        } else if (database === Database.MongoDB) {
+          console.log(chalk.gray(`  1. Set DATABASE_URL in .env to your MongoDB connection string`));
           console.log(chalk.gray(`  2. Run: ${pushCmd}`));
           console.log(chalk.gray(`  3. Run: ${devCmd}`));
         } else {

@@ -10,13 +10,14 @@ import { generateRoutes } from "@/lib/commands/make/generators/routes.js";
 import { generateHttpRequests } from "@/lib/commands/make/generators/http.js";
 import { injectRouteIntoIndex } from "@/lib/commands/make/injectors/index-injector.js";
 import type { ProjectConfig as MakeProjectConfig } from "@/lib/commands/make/detect.js";
+import { Database } from "@/lib/types/index.js";
 
 // ── Prompt ────────────────────────────────────────────────────────────────────
 
 const STARTER_CHOICES: Record<string, { name: string; value: string; description: string }[]> = {
   api: [
     { name: "Blank", value: "blank", description: "Empty project — add resources with kickpress make" },
-    { name: "Todo", value: "todo", description: "Pre-built Todo CRUD API (SQLite, ready to run)" },
+    { name: "Todo", value: "todo", description: "Pre-built Todo CRUD API (ready to run)" },
   ],
   web: [
     { name: "Blank", value: "blank", description: "Empty project" },
@@ -47,6 +48,7 @@ export const applyTodoStarter = async (
   typescript: boolean,
   packageManager: string,
   template: string,
+  database: Database = Database.SQLite,
 ): Promise<void> => {
   const ext = typescript ? "ts" : "js";
 
@@ -56,6 +58,7 @@ export const applyTodoStarter = async (
     srcDir: "src",
     fileExtension: ext,
     hasDatabase: true,
+    database,
   };
 
   await generateModel(projectPath, "todo", "Todo", makeConfig);
@@ -69,10 +72,17 @@ export const applyTodoStarter = async (
   // Append complete Todo model to schema (with actual fields, not a stub)
   const schemaPath = join(projectPath, "prisma", "schema.prisma");
   const schema = readFileSync(schemaPath, "utf-8");
-  writeFileSync(
-    schemaPath,
-    schema +
-      `
+  const todoModel = database === Database.MongoDB
+    ? `
+model Todo {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  title     String
+  completed Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+`
+    : `
 model Todo {
   id        Int      @id @default(autoincrement())
   title     String
@@ -80,17 +90,17 @@ model Todo {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
-`,
-  );
+`;
+  writeFileSync(schemaPath, schema + todoModel);
 
   // Override validation with pre-filled Todo schemas
   const validationPath = join(projectPath, "src", "validations", `todo.validation.${ext}`);
-  writeFileSync(validationPath, todoValidation(typescript));
+  writeFileSync(validationPath, todoValidation(typescript, database === Database.MongoDB));
 
   // Override types with Todo-specific fields (TS only)
   if (typescript) {
     const typesPath = join(projectPath, "src", "types", "todo.d.ts");
-    writeFileSync(typesPath, todoTypes());
+    writeFileSync(typesPath, todoTypes(database === Database.MongoDB));
   }
 
   // For web template: replace the frontend with a working todo UI
@@ -99,7 +109,23 @@ model Todo {
   }
 };
 
-const todoValidation = (typescript: boolean): string => {
+const todoValidation = (typescript: boolean, isMongo = false): string => {
+  const idSchemaTs = isMongo
+    ? `const idParamSchema = z.object({
+  id: z
+    .string()
+    .regex(/^[a-f\\d]{24}$/i, "ID must be a valid MongoDB ObjectId"),
+});`
+    : `const idParamSchema = z.object({
+  id: z
+    .string()
+    .regex(/^\\d+$/, "ID must be a positive integer")
+    .transform(Number)
+    .refine((n) => n > 0 && n <= Number.MAX_SAFE_INTEGER, {
+      message: "ID out of valid range",
+    }),
+});`;
+
   if (typescript) {
     return `import { Request, Response, NextFunction } from "express";
 import { z } from "zod";
@@ -114,15 +140,7 @@ const todoUpdateSchema = z.object({
   completed: z.boolean().optional(),
 });
 
-const idParamSchema = z.object({
-  id: z
-    .string()
-    .regex(/^\\d+$/, "ID must be a positive integer")
-    .transform(Number)
-    .refine((n) => n > 0 && n <= Number.MAX_SAFE_INTEGER, {
-      message: "ID out of valid range",
-    }),
-});
+${idSchemaTs}
 
 const validate = (schema: z.ZodSchema, source: "body" | "params" = "body") => {
   return (req: Request, res: Response, next: NextFunction) => {
@@ -153,6 +171,22 @@ export { todoCreateSchema, todoUpdateSchema, idParamSchema };
 `;
   }
 
+  const idSchemaJs = isMongo
+    ? `const idParamSchema = z.object({
+  id: z
+    .string()
+    .regex(/^[a-f\\d]{24}$/i, "ID must be a valid MongoDB ObjectId"),
+});`
+    : `const idParamSchema = z.object({
+  id: z
+    .string()
+    .regex(/^\\d+$/, "ID must be a positive integer")
+    .transform(Number)
+    .refine((n) => n > 0 && n <= Number.MAX_SAFE_INTEGER, {
+      message: "ID out of valid range",
+    }),
+});`;
+
   return `import { z } from "zod";
 
 const todoCreateSchema = z.object({
@@ -165,15 +199,7 @@ const todoUpdateSchema = z.object({
   completed: z.boolean().optional(),
 });
 
-const idParamSchema = z.object({
-  id: z
-    .string()
-    .regex(/^\\d+$/, "ID must be a positive integer")
-    .transform(Number)
-    .refine((n) => n > 0 && n <= Number.MAX_SAFE_INTEGER, {
-      message: "ID out of valid range",
-    }),
-});
+${idSchemaJs}
 
 const validate = (schema, source = "body") => {
   return (req, res, next) => {
@@ -204,8 +230,8 @@ export { todoCreateSchema, todoUpdateSchema, idParamSchema };
 `;
 };
 
-const todoTypes = (): string => `export interface Todo {
-  id: number;
+const todoTypes = (isMongo = false): string => `export interface Todo {
+  id: ${isMongo ? "string" : "number"};
   title: string;
   completed: boolean;
   createdAt: Date;

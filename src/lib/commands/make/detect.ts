@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from "fs";
 import { join } from "path";
+import { Database } from "@/lib/types/index.js";
 
 export interface ProjectConfig {
   typescript: boolean;
@@ -7,6 +8,7 @@ export interface ProjectConfig {
   srcDir: string;
   fileExtension: string;
   hasDatabase: boolean;
+  database?: Database;
 }
 
 export const detectProjectConfig = (
@@ -46,11 +48,28 @@ export const detectProjectConfig = (
     !!packageJson.dependencies?.["@prisma/client"] ||
     !!packageJson.devDependencies?.prisma;
 
+  let database: Database | undefined;
+  if (hasDatabase) {
+    const schemaPath = join(workingDir, "prisma", "schema.prisma");
+    if (existsSync(schemaPath)) {
+      const schema = readFileSync(schemaPath, "utf-8");
+      const match = schema.match(/provider\s*=\s*"(sqlite|postgresql|mysql|mongodb)"/);
+      if (match) {
+        const provider = match[1];
+        if (provider === "sqlite") database = Database.SQLite;
+        else if (provider === "postgresql") database = Database.PostgreSQL;
+        else if (provider === "mysql") database = Database.MySQL;
+        else if (provider === "mongodb") database = Database.MongoDB;
+      }
+    }
+  }
+
   return {
     typescript,
     packageManager,
     srcDir: "src",
     fileExtension: typescript ? "ts" : "js",
     hasDatabase,
+    database,
   };
 };

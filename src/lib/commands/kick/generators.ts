@@ -111,13 +111,23 @@ export const generatePackageJson = (config: ProjectConfig): object => {
         devDependencies["@types/better-sqlite3"] = "^7.6.13";
       } else if (database === Database.PostgreSQL) {
         dependencies["@prisma/adapter-pg"] = "^7.4.1";
+      } else if (database === Database.MySQL) {
+        dependencies["@prisma/adapter-mariadb"] = "^7.4.1";
       }
-      dependencies["@prisma/client"] = "^7.4.1";
-      devDependencies.prisma = "^7.4.1";
+      // MongoDB uses Prisma v6 (v7 MongoDB support is pending)
+      if (database === Database.MongoDB) {
+        dependencies["@prisma/client"] = "6.19.0";
+        devDependencies.prisma = "6.19.0";
+      } else {
+        dependencies["@prisma/client"] = "^7.4.1";
+        devDependencies.prisma = "^7.4.1";
+      }
       scripts["db:generate"] = "prisma generate";
       scripts["db:push"] = "prisma db push";
-      scripts["db:migrate"] = "prisma migrate dev";
-      scripts["db:studio"] = "prisma studio";
+      if (database !== Database.MongoDB) {
+        scripts["db:migrate"] = "prisma migrate dev";
+        scripts["db:studio"] = "prisma studio";
+      }
     }
   } else {
     // api / web — Express-based
@@ -134,13 +144,23 @@ export const generatePackageJson = (config: ProjectConfig): object => {
         devDependencies["@types/better-sqlite3"] = "^7.6.13";
       } else if (database === Database.PostgreSQL) {
         dependencies["@prisma/adapter-pg"] = "^7.4.1";
+      } else if (database === Database.MySQL) {
+        dependencies["@prisma/adapter-mariadb"] = "^7.4.1";
       }
-      dependencies["@prisma/client"] = "^7.4.1";
-      devDependencies.prisma = "^7.4.1";
+      // MongoDB uses Prisma v6 (v7 MongoDB support is pending)
+      if (database === Database.MongoDB) {
+        dependencies["@prisma/client"] = "6.19.0";
+        devDependencies.prisma = "6.19.0";
+      } else {
+        dependencies["@prisma/client"] = "^7.4.1";
+        devDependencies.prisma = "^7.4.1";
+      }
       scripts["db:generate"] = "prisma generate";
       scripts["db:push"] = "prisma db push";
-      scripts["db:migrate"] = "prisma migrate dev";
-      scripts["db:studio"] = "prisma studio";
+      if (database !== Database.MongoDB) {
+        scripts["db:migrate"] = "prisma migrate dev";
+        scripts["db:studio"] = "prisma studio";
+      }
     }
 
     if (typescript) {
@@ -235,10 +255,14 @@ app.listen(PORT, () => {
 export const generateErrorMiddleware = (
   typescript: boolean,
   withDatabase = false,
+  database?: Database,
 ): string => {
   if (typescript) {
     if (withDatabase) {
-      return `import { Prisma } from "../lib/generated/prisma/client";
+      const prismaImport = database === Database.MongoDB
+        ? `import { Prisma } from "../lib/generated/prisma";`
+        : `import { Prisma } from "../lib/generated/prisma/client";`;
+      return `${prismaImport}
 import { NextFunction, Request, Response } from "express";
 
 const errorHandler = (
@@ -331,6 +355,24 @@ export const generatePrismaClient = (
   typescript: boolean,
   database: Database,
 ): string => {
+  if (database === Database.MongoDB) {
+    if (typescript) {
+      return `import { PrismaClient } from "./generated/prisma";
+
+const prisma = new PrismaClient();
+
+export default prisma;
+`;
+    }
+
+    return `import { PrismaClient } from "./generated/prisma/index.js";
+
+const prisma = new PrismaClient();
+
+export default prisma;
+`;
+  }
+
   if (database === Database.PostgreSQL) {
     if (typescript) {
       return `import { PrismaClient } from "./generated/prisma/client";
@@ -351,6 +393,48 @@ import { PrismaPg } from "@prisma/adapter-pg";
 
 const adapter = new PrismaPg({
   connectionString: process.env.DATABASE_URL,
+});
+
+const prisma = new PrismaClient({ adapter });
+
+export default prisma;
+`;
+  }
+
+  if (database === Database.MySQL) {
+    if (typescript) {
+      return `import { PrismaClient } from "./generated/prisma/client";
+import { PrismaMariaDb } from "@prisma/adapter-mariadb";
+
+const { hostname, port, username, password, pathname } = new URL(process.env.DATABASE_URL!);
+
+const adapter = new PrismaMariaDb({
+  host: hostname,
+  port: parseInt(port) || 3306,
+  user: username,
+  password,
+  database: pathname.slice(1),
+  connectionLimit: 5,
+});
+
+const prisma = new PrismaClient({ adapter });
+
+export default prisma;
+`;
+    }
+
+    return `import { PrismaClient } from "./generated/prisma/index.js";
+import { PrismaMariaDb } from "@prisma/adapter-mariadb";
+
+const { hostname, port, username, password, pathname } = new URL(process.env.DATABASE_URL);
+
+const adapter = new PrismaMariaDb({
+  host: hostname,
+  port: parseInt(port) || 3306,
+  user: username,
+  password,
+  database: pathname.slice(1),
+  connectionLimit: 5,
 });
 
 const prisma = new PrismaClient({ adapter });
@@ -388,6 +472,20 @@ export default prisma;
 };
 
 export const generatePrismaSchema = (provider: string): string => {
+  if (provider === "mongodb") {
+    return `generator client {
+  provider = "prisma-client-js"
+  output   = "../src/lib/generated/prisma"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+`;
+  }
+
   return `generator client {
   provider = "prisma-client"
   output   = "../src/lib/generated/prisma"
@@ -400,7 +498,21 @@ datasource db {
 `;
 };
 
-export const generatePrismaConfig = (): string => {
+export const generatePrismaConfig = (database?: Database): string => {
+  if (database === Database.MongoDB) {
+    return `import "dotenv/config";
+import { defineConfig, env } from "prisma/config";
+
+export default defineConfig({
+  schema: "prisma/schema.prisma",
+  engine: "classic",
+  datasource: {
+    url: env("DATABASE_URL"),
+  },
+});
+`;
+  }
+
   return `import "dotenv/config";
 import { defineConfig, env } from "prisma/config";
 
@@ -580,9 +692,24 @@ Update your \`.env\` file with your PostgreSQL connection string:
 DATABASE_URL="postgresql://USER:PASSWORD@HOST:PORT/DATABASE?schema=public"
 \`\`\`
 
-Example:
+### 3. Setup Database Schema
+
+\`\`\`bash
+# Generate Prisma Client
+${runCmd} db:generate
+
+# Push schema to database
+${runCmd} db:push
+\`\`\`
+
+### 4. Start Development Server`
+      : database === "mysql"
+      ? `### 2. Configure Database
+
+Update your \`.env\` file with your MySQL connection string:
+
 \`\`\`env
-DATABASE_URL="postgresql://postgres:mypassword@localhost:5432/mydb?schema=public"
+DATABASE_URL="mysql://USER:PASSWORD@HOST:PORT/DATABASE"
 \`\`\`
 
 ### 3. Setup Database Schema
@@ -592,6 +719,28 @@ DATABASE_URL="postgresql://postgres:mypassword@localhost:5432/mydb?schema=public
 ${runCmd} db:generate
 
 # Push schema to database
+${runCmd} db:push
+\`\`\`
+
+### 4. Start Development Server`
+      : database === "mongodb"
+      ? `### 2. Configure Database
+
+Update your \`.env\` file with your MongoDB connection string:
+
+\`\`\`env
+DATABASE_URL="mongodb://localhost:27017/mydb"
+\`\`\`
+
+> Using MongoDB Atlas? Replace with your Atlas connection string.
+
+### 3. Setup Database Schema
+
+\`\`\`bash
+# Generate Prisma Client
+${runCmd} db:generate
+
+# Push schema to MongoDB (creates collections)
 ${runCmd} db:push
 \`\`\`
 
@@ -620,6 +769,18 @@ PORT=3000
 NODE_ENV=development
 DATABASE_URL="postgresql://USER:PASSWORD@HOST:PORT/DATABASE?schema=public"
 \`\`\``
+      : database === "mysql"
+      ? `\`\`\`env
+PORT=3000
+NODE_ENV=development
+DATABASE_URL="mysql://USER:PASSWORD@HOST:PORT/DATABASE"
+\`\`\``
+      : database === "mongodb"
+      ? `\`\`\`env
+PORT=3000
+NODE_ENV=development
+DATABASE_URL="mongodb://localhost:27017/mydb"
+\`\`\``
       : `\`\`\`env
 PORT=3000
 NODE_ENV=development
@@ -631,6 +792,10 @@ DATABASE_URL="file:./dev.db"
       ? ""
       : database === "postgresql"
       ? "- **PostgreSQL** - Powerful, open source object-relational database"
+      : database === "mysql"
+      ? "- **MySQL** - Widely-used open source relational database"
+      : database === "mongodb"
+      ? "- **MongoDB** - Flexible NoSQL document database"
       : "- **SQLite** - Default database (easily swappable)";
 
   return `# ${projectName}
@@ -698,9 +863,9 @@ ${
   database !== "none"
     ? `### Database Management
 - \`${runCmd} db:generate\` - Generate Prisma Client
-- \`${runCmd} db:push\` - Push schema changes to database
+- \`${runCmd} db:push\` - Push schema changes to database${database !== "mongodb" ? `
 - \`${runCmd} db:migrate\` - Create a new migration
-- \`${runCmd} db:studio\` - Open Prisma Studio (database GUI)
+- \`${runCmd} db:studio\` - Open Prisma Studio (database GUI)` : ""}
 
 `
     : ""
@@ -785,6 +950,10 @@ ${typescript ? "- **TypeScript** - Type-safe JavaScript\n" : ""}${
 ${database !== "none" ? "- [Prisma Docs](https://www.prisma.io/docs)\n" : ""}${typescript ? "- [TypeScript Docs](https://www.typescriptlang.org/)\n" : ""}${
     database === "postgresql"
       ? "- [PostgreSQL Docs](https://www.postgresql.org/docs/)\n"
+      : database === "mysql"
+      ? "- [MySQL Docs](https://dev.mysql.com/doc/)\n"
+      : database === "mongodb"
+      ? "- [MongoDB Docs](https://www.mongodb.com/docs/)\n"
       : ""
   }
 ## 🐛 Troubleshooting
@@ -813,11 +982,24 @@ Make sure:
 2. DATABASE_URL in \`.env\` is correct
 3. Database exists and is accessible
 4. User has proper permissions
-
-You can test the connection with:
-\`\`\`bash
-psql "${process.env.DATABASE_URL}"
-\`\`\`
+`
+    : database === "mysql"
+    ? `
+### Database connection errors
+Make sure:
+1. MySQL is running
+2. DATABASE_URL in \`.env\` is correct
+3. Database exists and is accessible
+4. User has proper permissions
+`
+    : database === "mongodb"
+    ? `
+### Database connection errors
+Make sure:
+1. MongoDB is running (or Atlas connection string is correct)
+2. DATABASE_URL in \`.env\` is correct
+3. MongoDB is running as a replica set (required by Prisma)
+4. For local dev: \`mongod --replSet rs0\`
 `
     : ""
 }${
@@ -925,9 +1107,13 @@ program.parse();
     const dbUrl =
       database === Database.SQLite
         ? "file:./dev.db"
-        : "postgresql://user:password@host:port/database?schema=public";
+        : database === Database.MySQL
+          ? "mysql://user:password@localhost:3306/database"
+          : database === Database.MongoDB
+            ? "mongodb://localhost:27017/mydb"
+            : "postgresql://user:password@host:port/database?schema=public";
     writeFileSync(join(projectPath, ".env"), generateEnvFile(dbUrl));
-    writeFileSync(join(projectPath, "prisma.config.ts"), generatePrismaConfig());
+    writeFileSync(join(projectPath, "prisma.config.ts"), generatePrismaConfig(database));
     writeFileSync(join(projectPath, "prisma", "schema.prisma"), generatePrismaSchema(database));
     writeFileSync(join(projectPath, "src", "lib", `prisma.${extension}`), generatePrismaClient(typescript, database));
     return;
@@ -940,7 +1126,7 @@ program.parse();
   );
   writeFileSync(
     join(projectPath, "src", "middlewares", `error.middleware.${extension}`),
-    generateErrorMiddleware(typescript, database !== Database.None),
+    generateErrorMiddleware(typescript, database !== Database.None, database),
   );
 
   if (template === "web") {
@@ -980,7 +1166,7 @@ h1 { margin-bottom: 1rem; }
     // Write Prisma files
     writeFileSync(
       join(projectPath, "prisma.config.ts"),
-      generatePrismaConfig(),
+      generatePrismaConfig(database),
     );
     writeFileSync(
       join(projectPath, "prisma", "schema.prisma"),
@@ -991,16 +1177,17 @@ h1 { margin-bottom: 1rem; }
       generatePrismaClient(typescript, database),
     );
 
-    writeFileSync(
-      join(projectPath, ".env"),
-      generateEnvFile(
-        database === Database.SQLite
-          ? "file:./dev.db"
-          : database === Database.PostgreSQL
-            ? "postgresql://user:password@host:port/database?schema=public"
-            : "",
-      ),
-    );
+    const dbUrl =
+      database === Database.SQLite
+        ? "file:./dev.db"
+        : database === Database.PostgreSQL
+          ? "postgresql://user:password@host:port/database?schema=public"
+          : database === Database.MySQL
+            ? "mysql://user:password@localhost:3306/database"
+            : database === Database.MongoDB
+              ? "mongodb://localhost:27017/mydb"
+              : "";
+    writeFileSync(join(projectPath, ".env"), generateEnvFile(dbUrl));
   } else {
     // Write .env without DATABASE_URL
     writeFileSync(

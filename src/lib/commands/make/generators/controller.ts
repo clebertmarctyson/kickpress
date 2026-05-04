@@ -1,6 +1,7 @@
 import { writeFileSync, mkdirSync, existsSync } from "fs";
 import { join } from "path";
 import type { ProjectConfig } from "@/lib/commands/make/detect.js";
+import { Database } from "@/lib/types/index.js";
 
 export const generateController = async (
   workingDir: string,
@@ -20,9 +21,11 @@ export const generateController = async (
     `${entity}.controller.${config.fileExtension}`
   );
 
+  const isMongo = config.database === Database.MongoDB;
+
   const content = config.typescript
-    ? generateTypeScriptController(entity, entityCapitalized, tableName)
-    : generateJavaScriptController(entity, entityCapitalized, tableName);
+    ? generateTypeScriptController(entity, entityCapitalized, tableName, isMongo)
+    : generateJavaScriptController(entity, entityCapitalized, tableName, isMongo);
 
   writeFileSync(controllerFile, content);
 };
@@ -30,8 +33,11 @@ export const generateController = async (
 const generateTypeScriptController = (
   entity: string,
   entityCapitalized: string,
-  tableName: string
+  tableName: string,
+  isMongo: boolean,
 ): string => {
+  const parseId = isMongo ? "id" : "Number(id)";
+
   return `import { Request, Response } from "express";
 import asyncHandler from "express-async-handler";
 import {
@@ -49,7 +55,7 @@ const all = asyncHandler(async (_: Request, res: Response) => {
 
 const findOne = asyncHandler(async (req: Request, res: Response) => {
   const { id } = req.params;
-  const ${entity} = await get${entityCapitalized}(Number(id));
+  const ${entity} = await get${entityCapitalized}(${parseId});
 
   if (!${entity}) {
     res.status(404);
@@ -66,7 +72,7 @@ const create = asyncHandler(async (req: Request, res: Response) => {
 
 const update = asyncHandler(async (req: Request, res: Response) => {
   const { id } = req.params;
-  const ${entity} = await get${entityCapitalized}(Number(id));
+  const ${entity} = await get${entityCapitalized}(${parseId});
 
   if (!${entity}) {
     res.status(404);
@@ -79,7 +85,7 @@ const update = asyncHandler(async (req: Request, res: Response) => {
 
 const remove = asyncHandler(async (req: Request, res: Response) => {
   const { id } = req.params;
-  const ${entity} = await get${entityCapitalized}(Number(id));
+  const ${entity} = await get${entityCapitalized}(${parseId});
 
   if (!${entity}) {
     res.status(404);
@@ -97,8 +103,11 @@ export { all, findOne, create, update, remove };
 const generateJavaScriptController = (
   entity: string,
   entityCapitalized: string,
-  tableName: string
+  tableName: string,
+  isMongo: boolean,
 ): string => {
+  const parseId = isMongo ? "id" : "Number(id)";
+
   return `import asyncHandler from "express-async-handler";
 import {
   getAll${entityCapitalized}s,
@@ -115,7 +124,7 @@ const all = asyncHandler(async (_, res) => {
 
 const findOne = asyncHandler(async (req, res) => {
   const { id } = req.params;
-  const ${entity} = await get${entityCapitalized}(Number(id));
+  const ${entity} = await get${entityCapitalized}(${parseId});
 
   if (!${entity}) {
     res.status(404);
@@ -132,7 +141,7 @@ const create = asyncHandler(async (req, res) => {
 
 const update = asyncHandler(async (req, res) => {
   const { id } = req.params;
-  const ${entity} = await get${entityCapitalized}(Number(id));
+  const ${entity} = await get${entityCapitalized}(${parseId});
 
   if (!${entity}) {
     res.status(404);
@@ -145,7 +154,7 @@ const update = asyncHandler(async (req, res) => {
 
 const remove = asyncHandler(async (req, res) => {
   const { id } = req.params;
-  const ${entity} = await get${entityCapitalized}(Number(id));
+  const ${entity} = await get${entityCapitalized}(${parseId});
 
   if (!${entity}) {
     res.status(404);

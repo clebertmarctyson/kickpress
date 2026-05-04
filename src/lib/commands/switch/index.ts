@@ -17,11 +17,13 @@ const detectCurrentDatabase = (workingDir: string): Database | null => {
   if (!existsSync(schemaPath)) return null;
 
   const schema = readFileSync(schemaPath, "utf-8");
-  const match = schema.match(/provider\s*=\s*"(\w+)"/);
+  const match = schema.match(/provider\s*=\s*"(sqlite|postgresql|mysql|mongodb)"/);
   if (!match) return null;
 
   if (match[1] === "sqlite") return Database.SQLite;
   if (match[1] === "postgresql") return Database.PostgreSQL;
+  if (match[1] === "mysql") return Database.MySQL;
+  if (match[1] === "mongodb") return Database.MongoDB;
   return null;
 };
 
@@ -33,7 +35,7 @@ export const registerSwitchCommand = (program: Command): void => {
   switchCommand
     .command("db [database]")
     .description(
-      "Switch database provider between sqlite and postgresql (schema and config only — data migration is manual)"
+      "Switch database provider between sqlite, postgresql, and mysql (schema and config only — data migration is manual)"
     )
     .action(async (database?: string) => {
       try {
@@ -57,6 +59,16 @@ export const registerSwitchCommand = (program: Command): void => {
           process.exit(1);
         }
 
+        if (currentDb === Database.MongoDB) {
+          console.error(
+            chalk.red(
+              "❌ Switching from MongoDB is not supported (MongoDB uses Prisma v6 while other databases use v7).\n" +
+              "   Please create a new project with your desired database instead."
+            )
+          );
+          process.exit(1);
+        }
+
         const pkg = JSON.parse(readFileSync(pkgPath, "utf-8"));
         const typescript = existsSync(join(workingDir, "tsconfig.json"));
         const fileExtension = typescript ? "ts" : "js";
@@ -69,13 +81,18 @@ export const registerSwitchCommand = (program: Command): void => {
         // Resolve target database
         let targetDb: Database;
         if (database) {
-          if (database !== "sqlite" && database !== "postgresql") {
+          if (database !== "sqlite" && database !== "postgresql" && database !== "mysql") {
             console.error(
-              chalk.red("❌ Invalid database. Valid options: sqlite, postgresql")
+              chalk.red("❌ Invalid database. Valid options for switch: sqlite, postgresql, mysql")
             );
             process.exit(1);
           }
-          targetDb = database === "sqlite" ? Database.SQLite : Database.PostgreSQL;
+          targetDb =
+            database === "sqlite"
+              ? Database.SQLite
+              : database === "mysql"
+                ? Database.MySQL
+                : Database.PostgreSQL;
           if (targetDb === currentDb) {
             console.error(
               chalk.red(`❌ Already using ${currentDb}. Nothing to switch.`)
@@ -88,6 +105,7 @@ export const registerSwitchCommand = (program: Command): void => {
             choices: [
               { name: "SQLite  (file-based, zero config)", value: Database.SQLite },
               { name: "PostgreSQL  (requires a running server)", value: Database.PostgreSQL },
+              { name: "MySQL  (requires a running server)", value: Database.MySQL },
             ].filter((c) => c.value !== currentDb),
           });
         }
@@ -131,28 +149,33 @@ export const registerSwitchCommand = (program: Command): void => {
 
         // 1. Swap packages
         console.log(chalk.gray("📦 Swapping database adapter packages..."));
-        if (currentDb === Database.SQLite && targetDb === Database.PostgreSQL) {
+        if (currentDb === Database.SQLite) {
           execSync(
             uninstall("better-sqlite3 @prisma/adapter-better-sqlite3 @types/better-sqlite3"),
             { cwd: workingDir, stdio: "inherit" }
           );
-          execSync(installProd("@prisma/adapter-pg"), {
-            cwd: workingDir,
-            stdio: "inherit",
-          });
+          if (targetDb === Database.PostgreSQL) {
+            execSync(installProd("@prisma/adapter-pg"), { cwd: workingDir, stdio: "inherit" });
+          } else {
+            execSync(installProd("@prisma/adapter-mariadb"), { cwd: workingDir, stdio: "inherit" });
+          }
+        } else if (currentDb === Database.PostgreSQL) {
+          execSync(uninstall("@prisma/adapter-pg"), { cwd: workingDir, stdio: "inherit" });
+          if (targetDb === Database.SQLite) {
+            execSync(installProd("better-sqlite3 @prisma/adapter-better-sqlite3"), { cwd: workingDir, stdio: "inherit" });
+            execSync(installDev("@types/better-sqlite3"), { cwd: workingDir, stdio: "inherit" });
+          } else {
+            execSync(installProd("@prisma/adapter-mariadb"), { cwd: workingDir, stdio: "inherit" });
+          }
         } else {
-          execSync(uninstall("@prisma/adapter-pg"), {
-            cwd: workingDir,
-            stdio: "inherit",
-          });
-          execSync(
-            installProd("better-sqlite3 @prisma/adapter-better-sqlite3"),
-            { cwd: workingDir, stdio: "inherit" }
-          );
-          execSync(installDev("@types/better-sqlite3"), {
-            cwd: workingDir,
-            stdio: "inherit",
-          });
+          // currentDb === MySQL
+          execSync(uninstall("@prisma/adapter-mariadb"), { cwd: workingDir, stdio: "inherit" });
+          if (targetDb === Database.SQLite) {
+            execSync(installProd("better-sqlite3 @prisma/adapter-better-sqlite3"), { cwd: workingDir, stdio: "inherit" });
+            execSync(installDev("@types/better-sqlite3"), { cwd: workingDir, stdio: "inherit" });
+          } else {
+            execSync(installProd("@prisma/adapter-pg"), { cwd: workingDir, stdio: "inherit" });
+          }
         }
 
         // 2. Update schema.prisma provider
@@ -170,7 +193,9 @@ export const registerSwitchCommand = (program: Command): void => {
         const newUrl =
           targetDb === Database.SQLite
             ? `"file:./dev.db"`
-            : `"postgresql://user:password@host:port/database?schema=public"`;
+            : targetDb === Database.MySQL
+              ? `"mysql://user:password@localhost:3306/database"`
+              : `"postgresql://user:password@host:port/database?schema=public"`;
 
         if (existsSync(envPath)) {
           let env = readFileSync(envPath, "utf-8");
@@ -191,7 +216,7 @@ export const registerSwitchCommand = (program: Command): void => {
         console.log(chalk.blue("\n📦 Running Prisma generate...\n"));
         execSync(run("db:generate"), { cwd: workingDir, stdio: "inherit" });
 
-        // 6. For SQLite: run db:push. For PostgreSQL: skip (needs real connection string first)
+        // 6. For SQLite: run db:push. For server DBs: skip (needs real connection string first)
         if (targetDb === Database.SQLite) {
           console.log(chalk.blue("\n📦 Running Prisma push...\n"));
           execSync(run("db:push"), { cwd: workingDir, stdio: "inherit" });
@@ -204,18 +229,16 @@ export const registerSwitchCommand = (program: Command): void => {
               )
             );
           }
+        } else if (targetDb === Database.MySQL) {
+          console.log(chalk.green("\n✅ Schema switched to MySQL!\n"));
+          console.log(chalk.cyan("Next steps:"));
+          console.log(chalk.gray("  1. Set DATABASE_URL in .env to your MySQL connection string"));
+          console.log(chalk.gray(`  2. Run: ${run("db:push")}`));
         } else {
           console.log(chalk.green("\n✅ Schema switched to PostgreSQL!\n"));
           console.log(chalk.cyan("Next steps:"));
-          console.log(
-            chalk.gray("  1. Set DATABASE_URL in .env to your PostgreSQL connection string")
-          );
+          console.log(chalk.gray("  1. Set DATABASE_URL in .env to your PostgreSQL connection string"));
           console.log(chalk.gray(`  2. Run: ${run("db:push")}`));
-          console.log(
-            chalk.gray(
-              "  3. Migrate your data manually (export from SQLite, import to PostgreSQL)"
-            )
-          );
         }
       } catch (error) {
         console.error(

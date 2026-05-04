@@ -1,6 +1,7 @@
 import { writeFileSync, mkdirSync, existsSync } from "fs";
 import { join } from "path";
 import type { ProjectConfig } from "@/lib/commands/make/detect.js";
+import { Database } from "@/lib/types/index.js";
 
 export const generateModel = async (
   workingDir: string,
@@ -16,17 +17,22 @@ export const generateModel = async (
 
   const modelFile = join(modelsDir, `${entity}.model.${config.fileExtension}`);
 
+  const isMongo = config.database === Database.MongoDB;
+
   const content = config.typescript
-    ? generateTypeScriptModel(entity, entityCapitalized)
-    : generateJavaScriptModel(entity);
+    ? generateTypeScriptModel(entity, entityCapitalized, isMongo)
+    : generateJavaScriptModel(entity, isMongo);
 
   writeFileSync(modelFile, content);
 };
 
 const generateTypeScriptModel = (
   entity: string,
-  entityCapitalized: string
+  entityCapitalized: string,
+  isMongo: boolean,
 ): string => {
+  const idType = isMongo ? "string" : "number";
+
   return `import prisma from "../lib/prisma";
 import type {
   ${entityCapitalized},
@@ -38,7 +44,7 @@ const ${entity}FindAll = async (): Promise<${entityCapitalized}[]> => {
   return prisma.${entity}.findMany();
 };
 
-const ${entity}FindOne = async (id: number): Promise<${entityCapitalized} | null> => {
+const ${entity}FindOne = async (id: ${idType}): Promise<${entityCapitalized} | null> => {
   return prisma.${entity}.findUnique({
     where: { id },
   });
@@ -51,7 +57,7 @@ const ${entity}Create = async (data: ${entityCapitalized}CreateInput): Promise<$
 };
 
 const ${entity}Update = async (
-  id: number,
+  id: ${idType},
   data: ${entityCapitalized}UpdateInput
 ): Promise<${entityCapitalized} | null> => {
   return prisma.${entity}.update({
@@ -60,7 +66,7 @@ const ${entity}Update = async (
   });
 };
 
-const ${entity}Delete = async (id: number): Promise<${entityCapitalized} | null> => {
+const ${entity}Delete = async (id: ${idType}): Promise<${entityCapitalized} | null> => {
   return prisma.${entity}.delete({
     where: { id },
   });
@@ -76,7 +82,7 @@ export {
 `;
 };
 
-const generateJavaScriptModel = (entity: string): string => {
+const generateJavaScriptModel = (entity: string, _isMongo: boolean): string => {
   return `import prisma from "../lib/prisma.js";
 
 const ${entity}FindAll = async () => {

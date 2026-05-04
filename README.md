@@ -42,11 +42,11 @@ Kickpress helps you create production-ready Express.js APIs in seconds, with ful
 - ⚡ **Starter Content** - Blank or pre-built starter (Todo API, Math library, Math CLI)
 - 🔒 **Security First** - Built-in input validation with Zod on all endpoints
 - 📦 **TypeScript First** - Full TypeScript support with proper types (JavaScript optional)
-- 🗄️ **Optional Database** - SQLite or PostgreSQL via Prisma — available for API, Web, and CLI templates
+- 🗄️ **Optional Database** - SQLite, PostgreSQL, MySQL, or MongoDB via Prisma — available for API, Web, and CLI templates
 - 🎯 **CRUD Generation** - Generate the full stack for any entity in one command
 - 🔄 **Auto-injection** - Routes automatically added to your app
 - ➕ **Add Database Later** - Add Prisma to any existing project with `kickpress add db`
-- 🔀 **Switch Database** - Switch between SQLite and PostgreSQL with `kickpress switch db`
+- 🔀 **Switch Database** - Switch between SQLite, PostgreSQL, and MySQL with `kickpress switch db`
 - ⚡ **Modern Stack** - Express, Prisma, Zod, tsx, and express-async-handler
 - 🛡️ **Error Handling** - Comprehensive error middleware included
 - 📝 **HTTP Requests** - Test files generated for each resource
@@ -71,7 +71,8 @@ Kickpress helps you create production-ready Express.js APIs in seconds, with ful
 - **Node.js**: v20.0.0 or higher (for `--env-file` support)
 - **Package Manager**: npm, pnpm, or yarn
 - **Operating System**: macOS, Linux, or Windows
-- **PostgreSQL**: Required only if using the PostgreSQL database option
+- **PostgreSQL / MySQL**: Required only if using those database options
+- **MongoDB**: Required only if using the MongoDB option — must run as a replica set (see [MongoDB setup](#mongodb))
 
 > **Note**: Kickpress uses Node.js native `--env-file` flag. For Node.js < v20, you may need additional configuration.
 
@@ -132,12 +133,12 @@ When you run `kickpress init` interactively, you'll be asked which starter to us
 
 | Template | Blank | Starter |
 | -------- | ----- | ------- |
-| `api`    | Empty project — add resources with `kickpress make` | **Todo** — complete CRUD API with `title`, `completed` fields, SQLite, ready to run |
+| `api`    | Empty project — add resources with `kickpress make` | **Todo** — complete CRUD API with `title`, `completed` fields, ready to run |
 | `web`    | Empty project | **Todo** — Todo API + working HTML/CSS/JS frontend |
 | `npm`    | `hello()` export | **Math library** — `sum`, `subtract`, `multiply`, `divide` with error handling |
 | `cli`    | `hello` command | **Math CLI** — `add 2 4 → 8`, `subtract`, `multiply`, `divide` commands |
 
-> **Note**: The Todo starter forces SQLite — no connection string needed. The `-y` flag always uses blank.
+> **Note**: The Todo starter defaults to SQLite — no connection string needed. Pass `--database mongodb` to use MongoDB instead. The `-y` flag always uses blank.
 
 ## 📖 Command Reference
 
@@ -162,7 +163,7 @@ kickpress init [project-name] [options]
 | Flag                           | Description                                             |
 | ------------------------------ | ------------------------------------------------------- |
 | `-t, --template <template>`    | Template: `api` \| `npm` \| `cli` \| `web`             |
-| `-d, --database <database>`    | Database: `sqlite` \| `postgresql` \| `none`           |
+| `-d, --database <database>`    | Database: `sqlite` \| `postgresql` \| `mysql` \| `mongodb` \| `none` |
 | `--typescript`                 | Use TypeScript                                          |
 | `--no-typescript`              | Use JavaScript instead                                  |
 | `-p, --package-manager <pm>`   | Package manager: `pnpm` \| `npm` \| `yarn`            |
@@ -185,6 +186,12 @@ npx kickpress init my-api -t api -d sqlite
 # API with PostgreSQL (db:push shown as next step — run after setting DATABASE_URL)
 npx kickpress init my-api -t api -d postgresql
 
+# API with MySQL (db:push shown as next step — run after setting DATABASE_URL)
+npx kickpress init my-api -t api -d mysql
+
+# API with MongoDB (db:push runs automatically — requires a running replica set)
+npx kickpress init my-api -t api -d mongodb
+
 # API with no database
 npx kickpress init my-api -t api -d none
 
@@ -204,7 +211,7 @@ npx kickpress init my-api --no-typescript -t api -d sqlite
 - ✅ Generates all configuration files
 - ✅ Installs all dependencies
 - ✅ Applies selected starter content
-- ✅ Generates Prisma Client and pushes schema (SQLite only — PostgreSQL shows next steps)
+- ✅ Generates Prisma Client and pushes schema (SQLite and MongoDB run automatically — PostgreSQL/MySQL show next steps)
 - ✅ Sets up error handling middleware
 - ✅ Configures TypeScript/JavaScript
 
@@ -281,7 +288,7 @@ kickpress add db [database]
 
 **Arguments:**
 
-- `database` — `sqlite` or `postgresql` (optional, will prompt if not provided)
+- `database` — `sqlite`, `postgresql`, `mysql`, or `mongodb` (optional, will prompt if not provided)
 
 **Examples:**
 
@@ -292,6 +299,8 @@ npx kickpress add db
 # Non-interactive
 npx kickpress add db sqlite
 npx kickpress add db postgresql
+npx kickpress add db mysql
+npx kickpress add db mongodb
 ```
 
 **What it does:**
@@ -302,9 +311,10 @@ npx kickpress add db postgresql
 - ✅ Patches `error.middleware.*` to handle Prisma error codes (`P2002`, `P2025`) — API/Web only
 - ✅ Appends `DATABASE_URL` to `.env`
 - ✅ Appends Prisma entries to `.gitignore`
-- ✅ Adds `db:generate`, `db:push`, `db:migrate`, `db:studio` scripts to `package.json`
-- ✅ Runs `db:generate` and `db:push` automatically (SQLite only)
-- ✅ For PostgreSQL: runs `db:generate`, then shows next steps to set `DATABASE_URL` and run `db:push`
+- ✅ Adds `db:generate` and `db:push` scripts to `package.json`
+- ✅ Adds `db:migrate` and `db:studio` scripts (SQLite, PostgreSQL, and MySQL only — not MongoDB)
+- ✅ Runs `db:generate` and `db:push` automatically (SQLite and MongoDB)
+- ✅ For PostgreSQL/MySQL: runs `db:generate`, then shows next steps to set `DATABASE_URL` and run `db:push`
 
 > **Note:** This command is safe to run on any Kickpress project (API, Web, or CLI). It will exit early if a database is already configured.
 
@@ -312,7 +322,9 @@ npx kickpress add db postgresql
 
 ### `switch db` - Switch Database Provider
 
-Switches your project between SQLite and PostgreSQL. Updates all configuration — packages, schema provider, `.env`, and the Prisma client file — without touching your schema models.
+Switches your project between SQLite, PostgreSQL, and MySQL. Updates all configuration — packages, schema provider, `.env`, and the Prisma client file — without touching your schema models.
+
+> ⚠️ **MongoDB cannot be switched to or from.** MongoDB uses Prisma v6, while SQLite/PostgreSQL/MySQL use Prisma v7. These are incompatible. Create a new project instead.
 
 **Syntax:**
 
@@ -322,7 +334,7 @@ kickpress switch db [database]
 
 **Arguments:**
 
-- `database` — `sqlite` or `postgresql` (optional, will prompt if not provided)
+- `database` — `sqlite`, `postgresql`, or `mysql` (optional, will prompt if not provided)
 
 **Examples:**
 
@@ -332,6 +344,7 @@ npx kickpress switch db
 
 # Non-interactive
 npx kickpress switch db postgresql
+npx kickpress switch db mysql
 npx kickpress switch db sqlite
 ```
 
@@ -344,7 +357,7 @@ npx kickpress switch db sqlite
 - ✅ Regenerates `src/lib/prisma.*` with the correct adapter
 - ✅ Runs `db:generate`
 - ✅ Runs `db:push` automatically when switching **to SQLite**
-- ✅ Shows next steps when switching **to PostgreSQL** (requires a live connection first)
+- ✅ Shows next steps when switching **to PostgreSQL or MySQL** (requires a live connection first)
 
 > ⚠️ **Data migration is manual.** `switch db` only switches the schema and configuration. Your existing data is not transferred. Back up your data before switching.
 
@@ -355,6 +368,18 @@ npx kickpress switch db sqlite
 DATABASE_URL="postgresql://USER:PASSWORD@HOST:PORT/DATABASE?schema=public"
 
 # 2. Push the schema to your PostgreSQL database
+pnpm db:push
+
+# 3. Migrate your data manually
+```
+
+**Next steps after switching to MySQL:**
+
+```bash
+# 1. Update your connection string in .env
+DATABASE_URL="mysql://user:password@localhost:3306/database"
+
+# 2. Push the schema to your MySQL database
 pnpm db:push
 
 # 3. Migrate your data manually
@@ -460,6 +485,32 @@ pnpm dev
 
 ---
 
+### REST API with MongoDB
+
+```bash
+npx kickpress init blog-api -t api -d mongodb
+cd blog-api
+```
+
+Update `.env` with your connection string (must point to a replica set):
+
+```env
+# Local replica set
+DATABASE_URL="mongodb://127.0.0.1:27017/blog-api?replicaSet=rs0&directConnection=true"
+
+# MongoDB Atlas
+DATABASE_URL="mongodb+srv://user:pass@cluster.mongodb.net/blog-api?retryWrites=true&w=majority"
+```
+
+```bash
+pnpm db:push
+pnpm dev
+```
+
+> **Note:** MongoDB requires a running replica set. For local development, start `mongod --replSet rs0` and run `rs.initiate()` once in `mongosh`. For production, use [MongoDB Atlas](https://www.mongodb.com/atlas).
+
+---
+
 ### CLI Tool with Database
 
 ```bash
@@ -493,10 +544,16 @@ npx kickpress add db sqlite
 npx kickpress switch db postgresql
 # → Update DATABASE_URL in .env, then run: pnpm db:push
 
+# Switch from SQLite to MySQL
+npx kickpress switch db mysql
+# → Update DATABASE_URL in .env, then run: pnpm db:push
+
 # Switch back to SQLite
 npx kickpress switch db sqlite
 # → db:push runs automatically
 ```
+
+> MongoDB cannot be switched to or from (different Prisma major version). Create a new project instead.
 
 ## 📁 Generated Project Structure
 
@@ -618,9 +675,11 @@ pnpm start        # Start production server
 # Database (when configured)
 pnpm db:generate  # Generate Prisma Client
 pnpm db:push      # Push schema to database
-pnpm db:migrate   # Create migration
-pnpm db:studio    # Open Prisma Studio
+pnpm db:migrate   # Create migration (SQLite, PostgreSQL, MySQL only)
+pnpm db:studio    # Open Prisma Studio (SQLite, PostgreSQL, MySQL only)
 ```
+
+> `db:migrate` and `db:studio` are not added for MongoDB projects (Prisma Studio does not support MongoDB).
 
 ## 🛠️ Technology Stack
 
@@ -630,9 +689,11 @@ pnpm db:studio    # Open Prisma Studio
 - **Commander.js** — CLI argument parsing (CLI template)
 - **tsx** — TypeScript execution engine
 - **express-async-handler** — Async error handling
-- **Prisma** — Next-generation ORM (optional)
+- **Prisma** — Next-generation ORM (optional) — v7 for SQLite/PostgreSQL/MySQL, v6.19 for MongoDB
 - **SQLite** — File-based, zero config (with better-sqlite3 adapter)
 - **PostgreSQL** — Production-ready (with @prisma/adapter-pg)
+- **MySQL** — Production-ready (with @prisma/adapter-mariadb)
+- **MongoDB** — Document database via Prisma v6.19 (requires replica set)
 
 ## 🗄️ Database Support
 
@@ -667,6 +728,45 @@ DATABASE_URL="postgresql://postgres:pass@db.project.supabase.co:5432/postgres?sc
 DATABASE_URL="postgresql://postgres:pass@containers-us-west.railway.app:5432/railway?schema=public"
 ```
 
+### MySQL
+
+Kickpress generates all config files and runs `db:generate`, then shows you the next steps to run after configuring your connection string.
+
+```env
+DATABASE_URL="mysql://user:password@localhost:3306/database"
+```
+
+### MongoDB
+
+Kickpress uses **Prisma v6.19** for MongoDB (Prisma v7 MongoDB support is pending). It generates all config files and runs `db:generate` + `db:push` automatically once your connection string is set.
+
+**MongoDB requires a replica set** — Prisma uses multi-document transactions which are only available on replica sets.
+
+```env
+# Local replica set
+DATABASE_URL="mongodb://127.0.0.1:27017/mydb?replicaSet=rs0&directConnection=true"
+
+# MongoDB Atlas (replica set is built-in)
+DATABASE_URL="mongodb+srv://user:pass@cluster.mongodb.net/mydb?retryWrites=true&w=majority"
+```
+
+**Local replica set setup (one-time):**
+
+```bash
+# Start mongod with replica set mode
+mongod --replSet rs0 --dbpath /your/data/path
+
+# In another terminal, initiate the replica set (first time only)
+mongosh --eval "rs.initiate()"
+```
+
+**MongoDB differences from other providers:**
+
+- IDs are `String` (MongoDB ObjectId) instead of `Int`
+- No `db:migrate` or `db:studio` scripts (not supported)
+- Cannot use `switch db` to/from MongoDB (different Prisma major version)
+- Uses `prisma-client-js` generator (Prisma v6) instead of `prisma-client` (Prisma v7)
+
 ### No Database
 
 ```bash
@@ -678,10 +778,13 @@ npx kickpress add db sqlite  # add later
 
 ```bash
 npx kickpress switch db postgresql  # SQLite → PostgreSQL
-npx kickpress switch db sqlite      # PostgreSQL → SQLite
+npx kickpress switch db mysql       # SQLite → MySQL
+npx kickpress switch db sqlite      # PostgreSQL/MySQL → SQLite
 ```
 
 > ⚠️ Schema and config switch automatically. Data migration is manual.
+>
+> ⚠️ MongoDB cannot be switched to or from. MongoDB uses Prisma v6, while SQLite/PostgreSQL/MySQL use Prisma v7. Create a new project with your desired database instead.
 
 ## 🧪 Testing Your API
 
@@ -729,22 +832,43 @@ psql "postgresql://USER:PASSWORD@HOST:PORT/DATABASE"
 
 Common causes: wrong credentials, database doesn't exist, SSL required (`?sslmode=require`).
 
+### MongoDB connection errors
+
+```bash
+mongosh "mongodb://127.0.0.1:27017"
+```
+
+Common causes:
+- **Not a replica set**: Prisma requires MongoDB to run as a replica set. Start with `mongod --replSet rs0` and run `rs.initiate()` once in `mongosh`.
+- **Wrong port**: If port 27017 is in use by a system MongoDB service, try a different port (`--port 27018`) and update `DATABASE_URL` accordingly.
+- **Missing `directConnection=true`**: Required for local single-node replica sets (`?directConnection=true`).
+- **Atlas connection**: Make sure your IP is allowlisted in MongoDB Atlas Network Access.
+
 ## ❓ FAQ
 
 **Q: Can I use this in production?**
 A: Yes! Use PostgreSQL for production and add authentication, CORS, and rate limiting as needed.
 
 **Q: What databases are supported?**
-A: SQLite and PostgreSQL. MySQL and MongoDB support planned.
+A: SQLite, PostgreSQL, MySQL, and MongoDB. All four are fully supported.
 
 **Q: Can I add a database to a CLI project?**
-A: Yes! Run `npx kickpress add db sqlite` from inside your CLI project.
+A: Yes! Run `npx kickpress add db sqlite` (or another provider) from inside your CLI project.
 
 **Q: Can I switch from SQLite to PostgreSQL later?**
 A: Yes! Run `npx kickpress switch db postgresql`. Your schema models are preserved — only the provider and adapter change. Data migration is manual.
 
-**Q: Why doesn't `db:push` run automatically for PostgreSQL?**
-A: PostgreSQL requires a running server and a valid connection string. Kickpress sets up all config files and generates the client, then shows you the exact commands to run once `DATABASE_URL` is configured.
+**Q: Can I switch to or from MongoDB?**
+A: No. MongoDB uses Prisma v6.19 while SQLite/PostgreSQL/MySQL use Prisma v7. These are not compatible in the same project. Create a new project with your desired database instead.
+
+**Q: Why doesn't `db:push` run automatically for PostgreSQL/MySQL?**
+A: PostgreSQL and MySQL require a running server and a valid connection string. Kickpress sets up all config files and generates the client, then shows you the exact commands to run once `DATABASE_URL` is configured.
+
+**Q: Does MongoDB work without a replica set?**
+A: No. Prisma requires MongoDB to run as a replica set (even locally) to support multi-document transactions. For local dev, start `mongod --replSet rs0` and run `rs.initiate()` once in `mongosh`. For production, use MongoDB Atlas.
+
+**Q: Why is MongoDB on Prisma v6 and not v7?**
+A: Prisma v7 MongoDB support is pending. Kickpress uses Prisma v6.19 for MongoDB projects, which is the latest stable release with full MongoDB support. When Prisma v7 adds MongoDB support, `kickpress switch db` will be updated accordingly.
 
 **Q: What are starters?**
 A: Starters are optional pre-built starting points. Run `kickpress init` interactively to pick one — a full Todo CRUD API for `api`/`web`, or a math library/CLI for `npm`/`cli`. The `-y` flag always uses blank.

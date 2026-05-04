@@ -2,6 +2,7 @@ import { writeFileSync, mkdirSync, existsSync } from "fs";
 import { join } from "path";
 import type { ProjectConfig } from "@/lib/commands/make/detect.js";
 import { capitalizeFirst } from "@/lib/utils/index.js";
+import { Database } from "@/lib/types/index.js";
 
 export const generateValidations = async (
   workingDir: string,
@@ -19,14 +20,32 @@ export const generateValidations = async (
     `${entity}.validation.${config.fileExtension}`
   );
 
+  const isMongo = config.database === Database.MongoDB;
+
   const content = config.typescript
-    ? generateTypeScriptValidations(entity)
-    : generateJavaScriptValidations(entity);
+    ? generateTypeScriptValidations(entity, isMongo)
+    : generateJavaScriptValidations(entity, isMongo);
 
   writeFileSync(validationFile, content);
 };
 
-const generateTypeScriptValidations = (entity: string): string => {
+const generateTypeScriptValidations = (entity: string, isMongo: boolean): string => {
+  const idSchema = isMongo
+    ? `const idParamSchema = z.object({
+  id: z
+    .string()
+    .regex(/^[a-f\\d]{24}$/i, "ID must be a valid MongoDB ObjectId"),
+});`
+    : `const idParamSchema = z.object({
+  id: z
+    .string()
+    .regex(/^\\d+$/, "ID must be a positive integer")
+    .transform(Number)
+    .refine((n) => n > 0 && n <= Number.MAX_SAFE_INTEGER, {
+      message: "ID out of valid range",
+    }),
+});`;
+
   return `import { Request, Response, NextFunction } from "express";
 import { z } from "zod";
 
@@ -39,15 +58,7 @@ const ${entity}UpdateSchema = z.object({
   // Add your fields here (make them optional)
 });
 
-const idParamSchema = z.object({
-  id: z
-    .string()
-    .regex(/^\\d+$/, "ID must be a positive integer")
-    .transform(Number)
-    .refine((n) => n > 0 && n <= Number.MAX_SAFE_INTEGER, {
-      message: "ID out of valid range",
-    }),
-});
+${idSchema}
 
 // Validation middleware factory
 const validate = (schema: z.ZodSchema, source: "body" | "params" = "body") => {
@@ -95,7 +106,23 @@ export { ${entity}CreateSchema, ${entity}UpdateSchema, idParamSchema };
 `;
 };
 
-const generateJavaScriptValidations = (entity: string): string => {
+const generateJavaScriptValidations = (entity: string, isMongo: boolean): string => {
+  const idSchema = isMongo
+    ? `const idParamSchema = z.object({
+  id: z
+    .string()
+    .regex(/^[a-f\\d]{24}$/i, "ID must be a valid MongoDB ObjectId"),
+});`
+    : `const idParamSchema = z.object({
+  id: z
+    .string()
+    .regex(/^\\d+$/, "ID must be a positive integer")
+    .transform(Number)
+    .refine((n) => n > 0 && n <= Number.MAX_SAFE_INTEGER, {
+      message: "ID out of valid range",
+    }),
+});`;
+
   return `import { z } from "zod";
 
 // Validation schemas
@@ -107,15 +134,7 @@ const ${entity}UpdateSchema = z.object({
   // Add your fields here (make them optional)
 });
 
-const idParamSchema = z.object({
-  id: z
-    .string()
-    .regex(/^\\d+$/, "ID must be a positive integer")
-    .transform(Number)
-    .refine((n) => n > 0 && n <= Number.MAX_SAFE_INTEGER, {
-      message: "ID out of valid range",
-    }),
-});
+${idSchema}
 
 // Validation middleware factory
 const validate = (schema, source = "body") => {

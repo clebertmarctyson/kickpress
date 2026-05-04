@@ -1,5 +1,6 @@
 import { readFileSync, writeFileSync, existsSync } from "fs";
 import { join } from "path";
+import { Database } from "@/lib/types/index.js";
 
 export const updatePrismaSchema = async (
   workingDir: string,
@@ -22,8 +23,17 @@ export const updatePrismaSchema = async (
     return;
   }
 
-  // Generate new model
-  const newModel = `
+  const isMongo = schemaContent.includes('provider = "mongodb"');
+
+  const newModel = isMongo
+    ? `
+model ${entityCapitalized} {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+`
+    : `
 model ${entityCapitalized} {
   id        Int      @id @default(autoincrement())
   createdAt DateTime @default(now())
