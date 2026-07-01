@@ -2,6 +2,7 @@ import { writeFileSync, mkdirSync, existsSync } from "fs";
 import { join } from "path";
 import type { ProjectConfig } from "@/lib/commands/make/detect.js";
 import { Database } from "@/lib/types/index.js";
+import { formatCode } from "@/lib/utils/format.js";
 
 export const generateTypes = async (
   workingDir: string,
@@ -14,7 +15,7 @@ export const generateTypes = async (
     return;
   }
 
-  const entityDir = join(workingDir, config.srcDir, entity);
+  const entityDir = join(workingDir, config.srcDir, "modules", entity);
 
   if (!existsSync(entityDir)) {
     mkdirSync(entityDir, { recursive: true });
@@ -35,5 +36,5 @@ export type ${entityCapitalized}CreateInput = Omit<${entityCapitalized}, "id" | 
 export type ${entityCapitalized}UpdateInput = Partial<${entityCapitalized}CreateInput>;
 `;
 
-  writeFileSync(typeFile, content);
+  writeFileSync(typeFile, await formatCode(content, typeFile));
 };

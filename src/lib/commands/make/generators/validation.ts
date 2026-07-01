@@ -3,13 +3,14 @@ import { join } from "path";
 import type { ProjectConfig } from "@/lib/commands/make/detect.js";
 import { capitalizeFirst } from "@/lib/utils/index.js";
 import { Database } from "@/lib/types/index.js";
+import { formatCode } from "@/lib/utils/format.js";
 
 export const generateValidations = async (
   workingDir: string,
   entity: string,
   config: ProjectConfig
 ): Promise<void> => {
-  const entityDir = join(workingDir, config.srcDir, entity);
+  const entityDir = join(workingDir, config.srcDir, "modules", entity);
 
   if (!existsSync(entityDir)) {
     mkdirSync(entityDir, { recursive: true });
@@ -26,7 +27,7 @@ export const generateValidations = async (
     ? generateTypeScriptValidations(entity, isMongo)
     : generateJavaScriptValidations(entity, isMongo);
 
-  writeFileSync(validationFile, content);
+  writeFileSync(validationFile, await formatCode(content, validationFile));
 };
 
 const generateTypeScriptValidations = (entity: string, isMongo: boolean): string => {

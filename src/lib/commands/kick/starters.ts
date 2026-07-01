@@ -6,7 +6,7 @@ import { generateModel } from "@/lib/commands/make/generators/model.js";
 import { generateService } from "@/lib/commands/make/generators/service.js";
 import { generateController } from "@/lib/commands/make/generators/controller.js";
 import { generateValidations } from "@/lib/commands/make/generators/validation.js";
-import { generateModule } from "@/lib/commands/make/generators/module.js";
+import { generateRoutes } from "@/lib/commands/make/generators/routes.js";
 import { generateHttpRequests } from "@/lib/commands/make/generators/http.js";
 import { injectRouteIntoIndex } from "@/lib/commands/make/injectors/index-injector.js";
 import type { ProjectConfig as MakeProjectConfig } from "@/lib/commands/make/detect.js";
@@ -65,7 +65,7 @@ export const applyTodoStarter = async (
   await generateService(projectPath, "todo", "Todo", makeConfig);
   await generateController(projectPath, "todo", "Todo", "todos", makeConfig);
   await generateValidations(projectPath, "todo", makeConfig);
-  await generateModule(projectPath, "todo", "Todo", makeConfig);
+  await generateRoutes(projectPath, "todo", "Todo", makeConfig);
   await injectRouteIntoIndex(projectPath, "todo", "/todos", makeConfig);
   await generateHttpRequests(projectPath, "todo", "todos", "/todos");
 

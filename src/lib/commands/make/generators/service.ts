@@ -1,6 +1,7 @@
 import { writeFileSync, mkdirSync, existsSync } from "fs";
 import { join } from "path";
 import type { ProjectConfig } from "@/lib/commands/make/detect.js";
+import { formatCode } from "@/lib/utils/format.js";
 
 export const generateService = async (
   workingDir: string,
@@ -8,7 +9,7 @@ export const generateService = async (
   entityCapitalized: string,
   config: ProjectConfig
 ): Promise<void> => {
-  const entityDir = join(workingDir, config.srcDir, entity);
+  const entityDir = join(workingDir, config.srcDir, "modules", entity);
 
   if (!existsSync(entityDir)) {
     mkdirSync(entityDir, { recursive: true });
@@ -23,7 +24,7 @@ export const generateService = async (
     ? generateTypeScriptService(entity, entityCapitalized)
     : generateJavaScriptService(entity, entityCapitalized);
 
-  writeFileSync(serviceFile, content);
+  writeFileSync(serviceFile, await formatCode(content, serviceFile));
 };
 
 const generateTypeScriptService = (

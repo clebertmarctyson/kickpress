@@ -2,6 +2,7 @@ import { writeFileSync, mkdirSync, existsSync } from "fs";
 import { join } from "path";
 import type { ProjectConfig } from "@/lib/commands/make/detect.js";
 import { Database } from "@/lib/types/index.js";
+import { formatCode } from "@/lib/utils/format.js";
 
 export const generateController = async (
   workingDir: string,
@@ -10,7 +11,7 @@ export const generateController = async (
   tableName: string,
   config: ProjectConfig
 ): Promise<void> => {
-  const entityDir = join(workingDir, config.srcDir, entity);
+  const entityDir = join(workingDir, config.srcDir, "modules", entity);
 
   if (!existsSync(entityDir)) {
     mkdirSync(entityDir, { recursive: true });
@@ -27,7 +28,7 @@ export const generateController = async (
     ? generateTypeScriptController(entity, entityCapitalized, tableName, isMongo)
     : generateJavaScriptController(entity, entityCapitalized, tableName, isMongo);
 
-  writeFileSync(controllerFile, content);
+  writeFileSync(controllerFile, await formatCode(content, controllerFile));
 };
 
 const generateTypeScriptController = (

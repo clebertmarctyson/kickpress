@@ -95,8 +95,9 @@ export const generatePackageJson = (config: ProjectConfig): object => {
     const envFlag = database !== Database.None ? " --env-file=.env" : "";
     if (typescript) {
       devDependencies.tsx = "^4.21.0";
+      devDependencies["tsc-alias"] = "^1.8.16";
       scripts.dev = `tsx watch${envFlag} src/cli.ts`;
-      scripts.build = "tsc";
+      scripts.build = "tsc && tsc-alias";
       scripts.start = "node dist/cli.js";
     } else {
       scripts.dev = `node --watch${envFlag} src/cli.js`;
@@ -162,8 +163,9 @@ export const generatePackageJson = (config: ProjectConfig): object => {
     }
 
     if (typescript) {
+      devDependencies["tsc-alias"] = "^1.8.16";
       scripts.dev = "tsx watch --env-file=.env src/index.ts";
-      scripts.build = "tsc";
+      scripts.build = "tsc && tsc-alias";
       scripts.start = "node --env-file=.env dist/index.js";
     } else {
       scripts.dev = "node --watch --env-file=.env src/index.js";
@@ -913,16 +915,17 @@ ${
 }└── package.json
 \`\`\`
 
-After \`kickpress make <entity>\`, each entity gets its own module folder:
+After \`kickpress make <entity>\`, each entity gets its own folder under \`src/modules/\`:
 
 \`\`\`
 src/
-└── user/
-    ├── user.model.${typescript ? "ts" : "js"}
-    ├── user.service.${typescript ? "ts" : "js"}
-    ├── user.controller.${typescript ? "ts" : "js"}
-    ├── user.module.${typescript ? "ts" : "js"}    # wires the graph, owns the router
-${typescript ? `    ├── user.types.ts\n` : ""}    └── user.validation.${typescript ? "ts" : "js"}
+└── modules/
+    └── user/
+        ├── user.model.${typescript ? "ts" : "js"}
+        ├── user.service.${typescript ? "ts" : "js"}
+        ├── user.controller.${typescript ? "ts" : "js"}
+        ├── user.routes.${typescript ? "ts" : "js"}    # wires the graph, owns the router
+${typescript ? `        ├── user.types.ts\n` : ""}        └── user.validation.${typescript ? "ts" : "js"}
 \`\`\`
 
 ## 🧪 Testing Your API

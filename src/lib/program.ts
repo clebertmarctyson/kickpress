@@ -48,7 +48,7 @@ Examples:
 
   # Generate all CRUD resources for an entity
   $ npx kickpress make user
-  $ npx kickpress make post --table posts --route /posts
+  $ npx kickpress make post --route /posts
 
   # Add database to an existing project
   $ npx kickpress add db

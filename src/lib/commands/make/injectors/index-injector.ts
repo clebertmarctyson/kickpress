@@ -17,8 +17,9 @@ export const injectRouteIntoIndex = async (
 
   let content = readFileSync(barrelPath, "utf-8");
 
-  const importExt = config.typescript ? "" : ".js";
-  const importStatement = `import ${entity}Routes from "../${entity}/${entity}.module${importExt}";`;
+  const importStatement = config.typescript
+    ? `import ${entity}Routes from "@/modules/${entity}/${entity}.routes";`
+    : `import ${entity}Routes from "../modules/${entity}/${entity}.routes.js";`;
   const routeStatement = `router.use("${routePath}", ${entity}Routes);`;
 
   if (content.includes(importStatement)) {

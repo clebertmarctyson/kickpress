@@ -237,34 +237,39 @@ kickpress make <entity> [options]
 
 | Flag              | Description                                           |
 | ----------------- | ----------------------------------------------------- |
-| `--table <name>`  | Table name (plural), skips interactive prompt         |
 | `--route <path>`  | Route path (e.g. `/todos`), skips prompt              |
-| `-f, --force`     | Overwrite existing files                              |
+
+`tableName` (used for the list variable in the controller, e.g. `const people = ...`) is always derived from the route — the last path segment, `kebab-case` converted to `camelCase`. No separate table-name flag or prompt.
 
 **Examples:**
 
 ```bash
-# Interactive (prompts for table name and route path)
+# Interactive (prompts for the route path only)
 npx kickpress make user
 npx kickpress make post
 
 # Non-interactive (useful in scripts/CI)
-npx kickpress make todo --table todos --route /todos
-npx kickpress mk   post --table posts --route /posts
+npx kickpress make todo --route /todos
+npx kickpress mk   post --route /posts
+
+# Irregular plurals just work — table name comes from whatever you type here
+npx kickpress make person --route /people
 ```
 
 **What it generates:**
 
-| File                              | Description                                     |
-| --------------------------------- | ----------------------------------------------- |
-| `prisma/schema.prisma`            | Updated with new model stub                     |
-| `entity/entity.types.ts`          | TypeScript interfaces (TS only)                 |
-| `entity/entity.model.*`           | Raw Prisma database operations                  |
-| `entity/entity.service.*`         | Business logic wrapping the model               |
-| `entity/entity.controller.*`      | HTTP handlers (class, constructor DI)           |
-| `entity/entity.validation.*`      | Zod schemas and validation middleware           |
-| `entity/entity.module.*`          | Wires model → service → controller, owns router |
-| `requests/entity.http`            | HTTP test file for all endpoints                |
+| File                                       | Description                                     |
+| ------------------------------------------- | ----------------------------------------------- |
+| `prisma/schema.prisma`                     | Updated with new model stub                     |
+| `modules/entity/entity.types.ts`           | TypeScript interfaces (TS only)                 |
+| `modules/entity/entity.model.*`            | Raw Prisma database operations (constructor-injected client) |
+| `modules/entity/entity.service.*`          | Business logic wrapping the model               |
+| `modules/entity/entity.controller.*`       | HTTP handlers (class, constructor DI)           |
+| `modules/entity/entity.validation.*`       | Zod schemas and validation middleware           |
+| `modules/entity/entity.routes.*`           | Wires model → service → controller, owns router |
+| `requests/entity.http`                     | HTTP test file for all endpoints                |
+
+Requires a database to already be configured (`kickpress add db ...` or select one during `init`) — `make` exits early with an error otherwise. Generated code is formatted with Prettier before being written.
 
 Routes are also **auto-injected** into `src/routes/index.*`.
 
@@ -427,7 +432,7 @@ cd blog-api
 
 ```bash
 npx kickpress make post
-# Prompts: table name (e.g. posts), route path (e.g. /posts)
+# Prompts: route path (e.g. /posts) — table name (posts) is derived from it
 ```
 
 **3. Add fields to your model and validation:**
@@ -445,7 +450,7 @@ model Post {
 }
 ```
 
-Edit `src/validations/post.validation.ts`:
+Edit `src/modules/post/post.validation.ts`:
 
 ```typescript
 const postCreateSchema = z.object({
@@ -578,37 +583,40 @@ my-api/
 └── package.json
 ```
 
-After `kickpress make user`, each entity gets its own module folder:
+After `kickpress make user`, each entity gets its own folder under `src/modules/`:
 
 ```
 src/
-└── user/
-    ├── user.model.ts              # Prisma operations
-    ├── user.service.ts            # Business logic
-    ├── user.controller.ts         # HTTP handlers
-    ├── user.module.ts             # Wires graph + owns the router
-    ├── user.types.ts              # TypeScript interfaces
-    └── user.validation.ts         # Zod schemas + middleware
+└── modules/
+    └── user/
+        ├── user.model.ts              # Prisma operations
+        ├── user.service.ts            # Business logic
+        ├── user.controller.ts         # HTTP handlers
+        ├── user.routes.ts             # Wires graph + owns the router
+        ├── user.types.ts              # TypeScript interfaces
+        └── user.validation.ts         # Zod schemas + middleware
 ```
 
 ## 🎨 Generated Code Examples
 
-### Model (`src/user/user.model.ts`)
+### Model (`src/modules/user/user.model.ts`)
 
 ```typescript
-import prisma from "../lib/prisma";
+import type PrismaClientInstance from "@/lib/prisma";
 import type { User, UserCreateInput, UserUpdateInput } from "./user.types";
 
 export class UserModel {
-  async findAll(): Promise<User[]> { return prisma.user.findMany(); }
-  async findOne(id: number): Promise<User | null> { return prisma.user.findUnique({ where: { id } }); }
-  async create(data: UserCreateInput): Promise<User> { return prisma.user.create({ data }); }
-  async update(id: number, data: UserUpdateInput): Promise<User | null> { return prisma.user.update({ where: { id }, data }); }
-  async delete(id: number): Promise<User | null> { return prisma.user.delete({ where: { id } }); }
+  constructor(private prisma: typeof PrismaClientInstance) {}
+
+  async findAll(): Promise<User[]> { return this.prisma.user.findMany(); }
+  async findOne(id: number): Promise<User | null> { return this.prisma.user.findUnique({ where: { id } }); }
+  async create(data: UserCreateInput): Promise<User> { return this.prisma.user.create({ data }); }
+  async update(id: number, data: UserUpdateInput): Promise<User | null> { return this.prisma.user.update({ where: { id }, data }); }
+  async delete(id: number): Promise<User | null> { return this.prisma.user.delete({ where: { id } }); }
 }
 ```
 
-### Controller (`src/user/user.controller.ts`)
+### Controller (`src/modules/user/user.controller.ts`)
 
 ```typescript
 import { Request, Response } from "express";
@@ -643,16 +651,17 @@ export class UserController {
 }
 ```
 
-### Module (`src/user/user.module.ts`)
+### Routes (`src/modules/user/user.routes.ts`)
 
 ```typescript
 import { Router } from "express";
+import prisma from "@/lib/prisma";
 import { UserModel } from "./user.model";
 import { UserService } from "./user.service";
 import { UserController } from "./user.controller";
 import { validateUserCreate, validateUserUpdate, validateUserId } from "./user.validation";
 
-const model = new UserModel();
+const model = new UserModel(prisma);
 const service = new UserService(model);
 const controller = new UserController(service);
 
@@ -666,7 +675,7 @@ router.route("/:id")
 export default router;
 ```
 
-### Validation (`src/user/user.validation.ts`)
+### Validation (`src/modules/user/user.validation.ts`)
 
 Standard (fill in your fields after extending the Prisma model):
 

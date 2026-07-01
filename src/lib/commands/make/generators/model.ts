@@ -2,6 +2,7 @@ import { writeFileSync, mkdirSync, existsSync } from "fs";
 import { join } from "path";
 import type { ProjectConfig } from "@/lib/commands/make/detect.js";
 import { Database } from "@/lib/types/index.js";
+import { formatCode } from "@/lib/utils/format.js";
 
 export const generateModel = async (
   workingDir: string,
@@ -9,7 +10,7 @@ export const generateModel = async (
   entityCapitalized: string,
   config: ProjectConfig
 ): Promise<void> => {
-  const entityDir = join(workingDir, config.srcDir, entity);
+  const entityDir = join(workingDir, config.srcDir, "modules", entity);
 
   if (!existsSync(entityDir)) {
     mkdirSync(entityDir, { recursive: true });
@@ -23,7 +24,7 @@ export const generateModel = async (
     ? generateTypeScriptModel(entity, entityCapitalized, isMongo)
     : generateJavaScriptModel(entity, entityCapitalized, isMongo);
 
-  writeFileSync(modelFile, content);
+  writeFileSync(modelFile, await formatCode(content, modelFile));
 };
 
 const generateTypeScriptModel = (
@@ -33,7 +34,7 @@ const generateTypeScriptModel = (
 ): string => {
   const idType = isMongo ? "string" : "number";
 
-  return `import prisma from "../lib/prisma";
+  return `import type PrismaClientInstance from "@/lib/prisma";
 import type {
   ${entityCapitalized},
   ${entityCapitalized}CreateInput,
@@ -41,31 +42,33 @@ import type {
 } from "./${entity}.types";
 
 export class ${entityCapitalized}Model {
+  constructor(private prisma: typeof PrismaClientInstance) {}
+
   async findAll(): Promise<${entityCapitalized}[]> {
-    return prisma.${entity}.findMany();
+    return this.prisma.${entity}.findMany();
   }
 
   async findOne(id: ${idType}): Promise<${entityCapitalized} | null> {
-    return prisma.${entity}.findUnique({
+    return this.prisma.${entity}.findUnique({
       where: { id },
     });
   }
 
   async create(data: ${entityCapitalized}CreateInput): Promise<${entityCapitalized}> {
-    return prisma.${entity}.create({
+    return this.prisma.${entity}.create({
       data,
     });
   }
 
   async update(id: ${idType}, data: ${entityCapitalized}UpdateInput): Promise<${entityCapitalized} | null> {
-    return prisma.${entity}.update({
+    return this.prisma.${entity}.update({
       where: { id },
       data,
     });
   }
 
   async delete(id: ${idType}): Promise<${entityCapitalized} | null> {
-    return prisma.${entity}.delete({
+    return this.prisma.${entity}.delete({
       where: { id },
     });
   }
@@ -74,34 +77,36 @@ export class ${entityCapitalized}Model {
 };
 
 const generateJavaScriptModel = (entity: string, entityCapitalized: string, _isMongo: boolean): string => {
-  return `import prisma from "../lib/prisma.js";
+  return `export class ${entityCapitalized}Model {
+  constructor(prisma) {
+    this.prisma = prisma;
+  }
 
-export class ${entityCapitalized}Model {
   async findAll() {
-    return prisma.${entity}.findMany();
+    return this.prisma.${entity}.findMany();
   }
 
   async findOne(id) {
-    return prisma.${entity}.findUnique({
+    return this.prisma.${entity}.findUnique({
       where: { id },
     });
   }
 
   async create(data) {
-    return prisma.${entity}.create({
+    return this.prisma.${entity}.create({
       data,
     });
   }
 
   async update(id, data) {
-    return prisma.${entity}.update({
+    return this.prisma.${entity}.update({
       where: { id },
       data,
     });
   }
 
   async delete(id) {
-    return prisma.${entity}.delete({
+    return this.prisma.${entity}.delete({
       where: { id },
     });
   }
