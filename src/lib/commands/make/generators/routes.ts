@@ -30,14 +30,14 @@ const generateTypeScriptRoutes = (
 ): string => {
   return `import { Router } from "express";
 import prisma from "@/lib/prisma";
-import { ${entityCapitalized}Model } from "./${entity}.model";
-import { ${entityCapitalized}Service } from "./${entity}.service";
-import { ${entityCapitalized}Controller } from "./${entity}.controller";
+import { ${entityCapitalized}Model } from "@/modules/${entity}/${entity}.model";
+import { ${entityCapitalized}Service } from "@/modules/${entity}/${entity}.service";
+import { ${entityCapitalized}Controller } from "@/modules/${entity}/${entity}.controller";
 import {
   validate${entityCapitalized}Create,
   validate${entityCapitalized}Update,
   validate${entityCapitalized}Id,
-} from "./${entity}.validation";
+} from "@/modules/${entity}/${entity}.validation";
 
 const model = new ${entityCapitalized}Model(prisma);
 const service = new ${entityCapitalized}Service(model);

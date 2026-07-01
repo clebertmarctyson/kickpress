@@ -31,12 +31,12 @@ const generateTypeScriptService = (
   entity: string,
   entityCapitalized: string
 ): string => {
-  return `import { ${entityCapitalized}Model } from "./${entity}.model";
+  return `import { ${entityCapitalized}Model } from "@/modules/${entity}/${entity}.model";
 import type {
   ${entityCapitalized},
   ${entityCapitalized}CreateInput,
   ${entityCapitalized}UpdateInput,
-} from "./${entity}.types";
+} from "@/modules/${entity}/${entity}.types";
 
 export class ${entityCapitalized}Service {
   constructor(private model: ${entityCapitalized}Model) {}

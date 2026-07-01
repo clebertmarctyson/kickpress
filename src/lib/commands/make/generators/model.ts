@@ -39,7 +39,7 @@ import type {
   ${entityCapitalized},
   ${entityCapitalized}CreateInput,
   ${entityCapitalized}UpdateInput,
-} from "./${entity}.types";
+} from "@/modules/${entity}/${entity}.types";
 
 export class ${entityCapitalized}Model {
   constructor(private prisma: typeof PrismaClientInstance) {}

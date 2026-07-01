@@ -237,8 +237,8 @@ export const generateIndexFile = (typescript: boolean, template: string): string
   if (typescript) {
     return `import express, { Request, Response } from "express";
 
-import routes from "./routes";
-import errorHandler from "./middlewares/error.middleware";
+import routes from "@/routes";
+import errorHandler from "@/middlewares/error.middleware";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -306,8 +306,8 @@ export const generateErrorMiddleware = (
   if (typescript) {
     if (withDatabase) {
       const prismaImport = database === Database.MongoDB
-        ? `import { Prisma } from "../lib/generated/prisma";`
-        : `import { Prisma } from "../lib/generated/prisma/client";`;
+        ? `import { Prisma } from "@/lib/generated/prisma";`
+        : `import { Prisma } from "@/lib/generated/prisma/client";`;
       return `${prismaImport}
 import { NextFunction, Request, Response } from "express";
 
@@ -403,7 +403,7 @@ export const generatePrismaClient = (
 ): string => {
   if (database === Database.MongoDB) {
     if (typescript) {
-      return `import { PrismaClient } from "./generated/prisma";
+      return `import { PrismaClient } from "@/lib/generated/prisma";
 
 const prisma = new PrismaClient();
 
@@ -421,7 +421,7 @@ export default prisma;
 
   if (database === Database.PostgreSQL) {
     if (typescript) {
-      return `import { PrismaClient } from "./generated/prisma/client";
+      return `import { PrismaClient } from "@/lib/generated/prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 
 const adapter = new PrismaPg({
@@ -449,7 +449,7 @@ export default prisma;
 
   if (database === Database.MySQL) {
     if (typescript) {
-      return `import { PrismaClient } from "./generated/prisma/client";
+      return `import { PrismaClient } from "@/lib/generated/prisma/client";
 import { PrismaMariaDb } from "@prisma/adapter-mariadb";
 
 const { hostname, port, username, password, pathname } = new URL(process.env.DATABASE_URL!);
@@ -491,7 +491,7 @@ export default prisma;
 
   // SQLite
   if (typescript) {
-    return `import { PrismaClient } from "./generated/prisma/client";
+    return `import { PrismaClient } from "@/lib/generated/prisma/client";
 import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
 
 const adapter = new PrismaBetterSqlite3({

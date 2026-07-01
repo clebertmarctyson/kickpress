@@ -41,7 +41,7 @@ const generateTypeScriptController = (
 
   return `import { Request, Response } from "express";
 import asyncHandler from "express-async-handler";
-import { ${entityCapitalized}Service } from "./${entity}.service";
+import { ${entityCapitalized}Service } from "@/modules/${entity}/${entity}.service";
 
 export class ${entityCapitalized}Controller {
   constructor(private service: ${entityCapitalized}Service) {}

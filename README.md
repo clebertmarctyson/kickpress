@@ -599,7 +599,7 @@ src/
 
 ```typescript
 import type PrismaClientInstance from "@/lib/prisma";
-import type { User, UserCreateInput, UserUpdateInput } from "./user.types";
+import type { User, UserCreateInput, UserUpdateInput } from "@/modules/user/user.types";
 
 export class UserModel {
   constructor(private prisma: typeof PrismaClientInstance) {}
@@ -617,7 +617,7 @@ export class UserModel {
 ```typescript
 import { Request, Response } from "express";
 import asyncHandler from "express-async-handler";
-import { UserService } from "./user.service";
+import { UserService } from "@/modules/user/user.service";
 
 export class UserController {
   constructor(private service: UserService) {}
@@ -652,10 +652,10 @@ export class UserController {
 ```typescript
 import { Router } from "express";
 import prisma from "@/lib/prisma";
-import { UserModel } from "./user.model";
-import { UserService } from "./user.service";
-import { UserController } from "./user.controller";
-import { validateUserCreate, validateUserUpdate, validateUserId } from "./user.validation";
+import { UserModel } from "@/modules/user/user.model";
+import { UserService } from "@/modules/user/user.service";
+import { UserController } from "@/modules/user/user.controller";
+import { validateUserCreate, validateUserUpdate, validateUserId } from "@/modules/user/user.validation";
 
 const model = new UserModel(prisma);
 const service = new UserService(model);
