@@ -8,14 +8,14 @@ export const generateService = async (
   entityCapitalized: string,
   config: ProjectConfig
 ): Promise<void> => {
-  const servicesDir = join(workingDir, config.srcDir, "services");
+  const entityDir = join(workingDir, config.srcDir, entity);
 
-  if (!existsSync(servicesDir)) {
-    mkdirSync(servicesDir, { recursive: true });
+  if (!existsSync(entityDir)) {
+    mkdirSync(entityDir, { recursive: true });
   }
 
   const serviceFile = join(
-    servicesDir,
+    entityDir,
     `${entity}.service.${config.fileExtension}`
   );
 
@@ -30,43 +30,36 @@ const generateTypeScriptService = (
   entity: string,
   entityCapitalized: string
 ): string => {
-  return `import {
-  ${entity}FindAll,
-  ${entity}FindOne,
-  ${entity}Create,
-  ${entity}Update,
-  ${entity}Delete,
-} from "../models/${entity}.model";
+  return `import { ${entityCapitalized}Model } from "./${entity}.model";
 import type {
   ${entityCapitalized},
   ${entityCapitalized}CreateInput,
   ${entityCapitalized}UpdateInput,
-} from "../types/${entity}";
+} from "./${entity}.types";
 
-export const getAll${entityCapitalized}s = async (): Promise<${entityCapitalized}[]> => {
-  return ${entity}FindAll();
-};
+export class ${entityCapitalized}Service {
+  constructor(private model: ${entityCapitalized}Model) {}
 
-export const get${entityCapitalized} = async (id: number): Promise<${entityCapitalized} | null> => {
-  return ${entity}FindOne(id);
-};
+  async getAll(): Promise<${entityCapitalized}[]> {
+    return this.model.findAll();
+  }
 
-export const create${entityCapitalized} = async (
-  data: ${entityCapitalized}CreateInput
-): Promise<${entityCapitalized}> => {
-  return ${entity}Create(data);
-};
+  async getOne(id: number): Promise<${entityCapitalized} | null> {
+    return this.model.findOne(id);
+  }
 
-export const update${entityCapitalized} = async (
-  id: number,
-  data: ${entityCapitalized}UpdateInput
-): Promise<${entityCapitalized} | null> => {
-  return ${entity}Update(id, data);
-};
+  async create(data: ${entityCapitalized}CreateInput): Promise<${entityCapitalized}> {
+    return this.model.create(data);
+  }
 
-export const delete${entityCapitalized} = async (id: number): Promise<${entityCapitalized} | null> => {
-  return ${entity}Delete(id);
-};
+  async update(id: number, data: ${entityCapitalized}UpdateInput): Promise<${entityCapitalized} | null> {
+    return this.model.update(id, data);
+  }
+
+  async delete(id: number): Promise<${entityCapitalized} | null> {
+    return this.model.delete(id);
+  }
+}
 `;
 };
 
@@ -74,32 +67,32 @@ const generateJavaScriptService = (
   entity: string,
   entityCapitalized: string
 ): string => {
-  return `import {
-  ${entity}FindAll,
-  ${entity}FindOne,
-  ${entity}Create,
-  ${entity}Update,
-  ${entity}Delete,
-} from "../models/${entity}.model.js";
+  return `import { ${entityCapitalized}Model } from "./${entity}.model.js";
 
-export const getAll${entityCapitalized}s = async () => {
-  return ${entity}FindAll();
-};
+export class ${entityCapitalized}Service {
+  constructor(model) {
+    this.model = model;
+  }
 
-export const get${entityCapitalized} = async (id) => {
-  return ${entity}FindOne(id);
-};
+  async getAll() {
+    return this.model.findAll();
+  }
 
-export const create${entityCapitalized} = async (data) => {
-  return ${entity}Create(data);
-};
+  async getOne(id) {
+    return this.model.findOne(id);
+  }
 
-export const update${entityCapitalized} = async (id, data) => {
-  return ${entity}Update(id, data);
-};
+  async create(data) {
+    return this.model.create(data);
+  }
 
-export const delete${entityCapitalized} = async (id) => {
-  return ${entity}Delete(id);
-};
+  async update(id, data) {
+    return this.model.update(id, data);
+  }
+
+  async delete(id) {
+    return this.model.delete(id);
+  }
+}
 `;
 };

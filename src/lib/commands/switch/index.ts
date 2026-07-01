@@ -6,10 +6,7 @@ import { select } from "@inquirer/prompts";
 import chalk from "chalk";
 
 import { getWorkingDirectory } from "@/lib/utils/paths.js";
-import {
-  generatePrismaSchema,
-  generatePrismaClient,
-} from "@/lib/commands/kick/generators.js";
+import { generatePrismaClient } from "@/lib/commands/kick/generators.js";
 import { Database } from "@/lib/types/index.js";
 
 const detectCurrentDatabase = (workingDir: string): Database | null => {
@@ -69,7 +66,6 @@ export const registerSwitchCommand = (program: Command): void => {
           process.exit(1);
         }
 
-        const pkg = JSON.parse(readFileSync(pkgPath, "utf-8"));
         const typescript = existsSync(join(workingDir, "tsconfig.json"));
         const fileExtension = typescript ? "ts" : "js";
 

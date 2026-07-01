@@ -9,14 +9,14 @@ export const generateValidations = async (
   entity: string,
   config: ProjectConfig
 ): Promise<void> => {
-  const validationsDir = join(workingDir, config.srcDir, "validations");
+  const entityDir = join(workingDir, config.srcDir, entity);
 
-  if (!existsSync(validationsDir)) {
-    mkdirSync(validationsDir, { recursive: true });
+  if (!existsSync(entityDir)) {
+    mkdirSync(entityDir, { recursive: true });
   }
 
   const validationFile = join(
-    validationsDir,
+    entityDir,
     `${entity}.validation.${config.fileExtension}`
   );
 

@@ -14,13 +14,13 @@ export const generateTypes = async (
     return;
   }
 
-  const typesDir = join(workingDir, config.srcDir, "types");
+  const entityDir = join(workingDir, config.srcDir, entity);
 
-  if (!existsSync(typesDir)) {
-    mkdirSync(typesDir, { recursive: true });
+  if (!existsSync(entityDir)) {
+    mkdirSync(entityDir, { recursive: true });
   }
 
-  const typeFile = join(typesDir, `${entity}.d.ts`);
+  const typeFile = join(entityDir, `${entity}.types.ts`);
 
   const idType = config.database === Database.MongoDB ? "string" : "number";
 

@@ -10,14 +10,14 @@ export const generateController = async (
   tableName: string,
   config: ProjectConfig
 ): Promise<void> => {
-  const controllersDir = join(workingDir, config.srcDir, "controllers");
+  const entityDir = join(workingDir, config.srcDir, entity);
 
-  if (!existsSync(controllersDir)) {
-    mkdirSync(controllersDir, { recursive: true });
+  if (!existsSync(entityDir)) {
+    mkdirSync(entityDir, { recursive: true });
   }
 
   const controllerFile = join(
-    controllersDir,
+    entityDir,
     `${entity}.controller.${config.fileExtension}`
   );
 
@@ -40,63 +40,59 @@ const generateTypeScriptController = (
 
   return `import { Request, Response } from "express";
 import asyncHandler from "express-async-handler";
-import {
-  getAll${entityCapitalized}s,
-  get${entityCapitalized},
-  create${entityCapitalized},
-  update${entityCapitalized},
-  delete${entityCapitalized},
-} from "../services/${entity}.service";
+import { ${entityCapitalized}Service } from "./${entity}.service";
 
-const all = asyncHandler(async (_: Request, res: Response) => {
-  const ${tableName} = await getAll${entityCapitalized}s();
-  res.json(${tableName});
-});
+export class ${entityCapitalized}Controller {
+  constructor(private service: ${entityCapitalized}Service) {}
 
-const findOne = asyncHandler(async (req: Request, res: Response) => {
-  const { id } = req.params;
-  const ${entity} = await get${entityCapitalized}(${parseId});
+  all = asyncHandler(async (_: Request, res: Response) => {
+    const ${tableName} = await this.service.getAll();
+    res.json(${tableName});
+  });
 
-  if (!${entity}) {
-    res.status(404);
-    throw new Error("${entityCapitalized} not found");
-  }
+  findOne = asyncHandler(async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const ${entity} = await this.service.getOne(${parseId});
 
-  res.json(${entity});
-});
+    if (!${entity}) {
+      res.status(404);
+      throw new Error("${entityCapitalized} not found");
+    }
 
-const create = asyncHandler(async (req: Request, res: Response) => {
-  const ${entity} = await create${entityCapitalized}(req.body);
-  res.status(201).json(${entity});
-});
+    res.json(${entity});
+  });
 
-const update = asyncHandler(async (req: Request, res: Response) => {
-  const { id } = req.params;
-  const ${entity} = await get${entityCapitalized}(${parseId});
+  create = asyncHandler(async (req: Request, res: Response) => {
+    const ${entity} = await this.service.create(req.body);
+    res.status(201).json(${entity});
+  });
 
-  if (!${entity}) {
-    res.status(404);
-    throw new Error("${entityCapitalized} not found");
-  }
+  update = asyncHandler(async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const ${entity} = await this.service.getOne(${parseId});
 
-  const updated${entityCapitalized} = await update${entityCapitalized}(${entity}.id, req.body);
-  res.json(updated${entityCapitalized});
-});
+    if (!${entity}) {
+      res.status(404);
+      throw new Error("${entityCapitalized} not found");
+    }
 
-const remove = asyncHandler(async (req: Request, res: Response) => {
-  const { id } = req.params;
-  const ${entity} = await get${entityCapitalized}(${parseId});
+    const updated${entityCapitalized} = await this.service.update(${entity}.id, req.body);
+    res.json(updated${entityCapitalized});
+  });
 
-  if (!${entity}) {
-    res.status(404);
-    throw new Error("${entityCapitalized} not found");
-  }
+  remove = asyncHandler(async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const ${entity} = await this.service.getOne(${parseId});
 
-  await delete${entityCapitalized}(${entity}.id);
-  res.status(204).send();
-});
+    if (!${entity}) {
+      res.status(404);
+      throw new Error("${entityCapitalized} not found");
+    }
 
-export { all, findOne, create, update, remove };
+    await this.service.delete(${entity}.id);
+    res.status(204).send();
+  });
+}
 `;
 };
 
@@ -109,62 +105,60 @@ const generateJavaScriptController = (
   const parseId = isMongo ? "id" : "Number(id)";
 
   return `import asyncHandler from "express-async-handler";
-import {
-  getAll${entityCapitalized}s,
-  get${entityCapitalized},
-  create${entityCapitalized},
-  update${entityCapitalized},
-  delete${entityCapitalized},
-} from "../services/${entity}.service.js";
+import { ${entityCapitalized}Service } from "./${entity}.service.js";
 
-const all = asyncHandler(async (_, res) => {
-  const ${tableName} = await getAll${entityCapitalized}s();
-  res.json(${tableName});
-});
-
-const findOne = asyncHandler(async (req, res) => {
-  const { id } = req.params;
-  const ${entity} = await get${entityCapitalized}(${parseId});
-
-  if (!${entity}) {
-    res.status(404);
-    throw new Error("${entityCapitalized} not found");
+export class ${entityCapitalized}Controller {
+  constructor(service) {
+    this.service = service;
   }
 
-  res.json(${entity});
-});
+  all = asyncHandler(async (_, res) => {
+    const ${tableName} = await this.service.getAll();
+    res.json(${tableName});
+  });
 
-const create = asyncHandler(async (req, res) => {
-  const ${entity} = await create${entityCapitalized}(req.body);
-  res.status(201).json(${entity});
-});
+  findOne = asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const ${entity} = await this.service.getOne(${parseId});
 
-const update = asyncHandler(async (req, res) => {
-  const { id } = req.params;
-  const ${entity} = await get${entityCapitalized}(${parseId});
+    if (!${entity}) {
+      res.status(404);
+      throw new Error("${entityCapitalized} not found");
+    }
 
-  if (!${entity}) {
-    res.status(404);
-    throw new Error("${entityCapitalized} not found");
-  }
+    res.json(${entity});
+  });
 
-  const updated${entityCapitalized} = await update${entityCapitalized}(${entity}.id, req.body);
-  res.json(updated${entityCapitalized});
-});
+  create = asyncHandler(async (req, res) => {
+    const ${entity} = await this.service.create(req.body);
+    res.status(201).json(${entity});
+  });
 
-const remove = asyncHandler(async (req, res) => {
-  const { id } = req.params;
-  const ${entity} = await get${entityCapitalized}(${parseId});
+  update = asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const ${entity} = await this.service.getOne(${parseId});
 
-  if (!${entity}) {
-    res.status(404);
-    throw new Error("${entityCapitalized} not found");
-  }
+    if (!${entity}) {
+      res.status(404);
+      throw new Error("${entityCapitalized} not found");
+    }
 
-  await delete${entityCapitalized}(${entity}.id);
-  res.status(204).send();
-});
+    const updated${entityCapitalized} = await this.service.update(${entity}.id, req.body);
+    res.json(updated${entityCapitalized});
+  });
 
-export { all, findOne, create, update, remove };
+  remove = asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const ${entity} = await this.service.getOne(${parseId});
+
+    if (!${entity}) {
+      res.status(404);
+      throw new Error("${entityCapitalized} not found");
+    }
+
+    await this.service.delete(${entity}.id);
+    res.status(204).send();
+  });
+}
 `;
 };

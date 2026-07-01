@@ -26,14 +26,12 @@ export const createProjectStructure = (
     case "api":
     default:
       folders = [
-        ...common,
-        "src/controllers",
-        "src/models",
+        "src",
+        "src/utils",
+        "src/lib",
         "src/routes",
-        "src/validations",
         "src/middlewares",
         "src/config",
-        "src/services",
         "requests",
       ];
   }
@@ -204,6 +202,7 @@ export const generateIndexFile = (typescript: boolean, template: string): string
   if (typescript) {
     return `import express, { Request, Response } from "express";
 
+import routes from "./routes";
 import errorHandler from "./middlewares/error.middleware";
 
 const app = express();
@@ -213,10 +212,11 @@ const PORT = process.env.PORT || 3000;
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 ${isWeb ? 'app.use(express.static("public"));\n' : ""}
-// Routes
 app.get("/api", (_: Request, res: Response) => {
   res.json({ message: "Welcome to my app" });
 });
+
+app.use("/api", routes);
 
 // Error Handler
 app.use(errorHandler);
@@ -229,6 +229,7 @@ app.listen(PORT, () => {
 
   return `import express from "express";
 
+import routes from "./routes/index.js";
 import errorHandler from "./middlewares/error.middleware.js";
 
 const app = express();
@@ -238,10 +239,11 @@ const PORT = process.env.PORT || 3000;
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 ${isWeb ? 'app.use(express.static("public"));\n' : ""}
-// Routes
 app.get("/api", (_, res) => {
   res.json({ message: "Welcome to my app" });
 });
+
+app.use("/api", routes);
 
 // Error Handler
 app.use(errorHandler);
@@ -249,6 +251,15 @@ app.use(errorHandler);
 app.listen(PORT, () => {
   console.log(\`🚀 Server running on http://localhost:\${PORT}\`);
 });
+`;
+};
+
+export const generateRoutesBarrel = (): string => {
+  return `import { Router } from "express";
+
+const router = Router();
+
+export default router;
 `;
 };
 
@@ -271,7 +282,7 @@ const errorHandler = (
   res: Response,
   _next: NextFunction
 ) => {
-  let statusCode = res.statusCode !== 200 ? res.statusCode : 500;
+  let statusCode = (err as any).status || (err as any).statusCode || (res.statusCode !== 200 ? res.statusCode : 500);
   let message: string | object = err.message;
 
   if (err instanceof Prisma.PrismaClientKnownRequestError) {
@@ -302,7 +313,7 @@ const errorHandler = (
   res: Response,
   _next: NextFunction
 ) => {
-  const statusCode = res.statusCode !== 200 ? res.statusCode : 500;
+  const statusCode = (err as any).status || (err as any).statusCode || (res.statusCode !== 200 ? res.statusCode : 500);
 
   res.status(statusCode).json({
     message: err.message,
@@ -316,7 +327,7 @@ export default errorHandler;
 
   if (withDatabase) {
     return `const errorHandler = (err, _req, res, _next) => {
-  let statusCode = res.statusCode !== 200 ? res.statusCode : 500;
+  let statusCode = err.status || err.statusCode || (res.statusCode !== 200 ? res.statusCode : 500);
   let message = err.message;
 
   // Handle Prisma errors
@@ -339,7 +350,7 @@ export default errorHandler;
   }
 
   return `const errorHandler = (err, _req, res, _next) => {
-  const statusCode = res.statusCode !== 200 ? res.statusCode : 500;
+  const statusCode = err.status || err.statusCode || (res.statusCode !== 200 ? res.statusCode : 500);
 
   res.status(statusCode).json({
     message: err.message,
@@ -883,31 +894,35 @@ npx kickpress make user
 \`\`\`
 ${projectName}/
 ├── src/
-│   ├── index.${typescript ? "ts" : "js"}           # Main entry point
-${
-  database !== "none"
-    ? `│   ├── lib/\n│   │   └── prisma.${typescript ? "ts" : "js"}      # Prisma client\n`
-    : ""
-}│   ├── controllers/                  # Request handlers
-│   ├── models/                       # Database operations
-│   ├── routes/                       # Express routes
-${
-  typescript ? "│   ├── types/                        # TypeScript types\n" : ""
-}│   ├── middlewares/
+│   ├── index.${typescript ? "ts" : "js"}           # App entry (sealed)
+│   ├── routes/
+│   │   └── index.${typescript ? "ts" : "js"}       # Route barrel
+│   ├── middlewares/
 │   │   └── error.middleware.${typescript ? "ts" : "js"}
-│   ├── config/                       # Configuration
-│   └── utils/                        # Utilities
+${database !== "none" ? `│   ├── lib/\n│   │   └── prisma.${typescript ? "ts" : "js"}\n` : ""}│   └── utils/
 ${
   database !== "none"
-    ? `├── prisma/\n│   ├── schema.prisma                 # Database schema\n│   └── migrations/                   # Database migrations\n`
+    ? `├── prisma/\n│   └── schema.prisma\n`
     : ""
 }├── requests/                         # HTTP test files
-├── .env                              # Environment variables
+├── .env
 ${
   typescript
-    ? "├── tsconfig.json                     # TypeScript config\n"
+    ? "├── tsconfig.json\n"
     : ""
 }└── package.json
+\`\`\`
+
+After \`kickpress make <entity>\`, each entity gets its own module folder:
+
+\`\`\`
+src/
+└── user/
+    ├── user.model.${typescript ? "ts" : "js"}
+    ├── user.service.${typescript ? "ts" : "js"}
+    ├── user.controller.${typescript ? "ts" : "js"}
+    ├── user.module.${typescript ? "ts" : "js"}    # wires the graph, owns the router
+${typescript ? `    ├── user.types.ts\n` : ""}    └── user.validation.${typescript ? "ts" : "js"}
 \`\`\`
 
 ## 🧪 Testing Your API
@@ -922,10 +937,10 @@ Or use curl:
 
 \`\`\`bash
 # Get all users
-curl http://localhost:3000/users
+curl http://localhost:3000/api/users
 
 # Create a user
-curl -X POST http://localhost:3000/users \\
+curl -X POST http://localhost:3000/api/users \\
   -H "Content-Type: application/json" \\
   -d '{"name":"John Doe","email":"john@example.com"}'
 \`\`\`
@@ -1127,6 +1142,10 @@ program.parse();
   writeFileSync(
     join(projectPath, "src", "middlewares", `error.middleware.${extension}`),
     generateErrorMiddleware(typescript, database !== Database.None, database),
+  );
+  writeFileSync(
+    join(projectPath, "src", "routes", `index.${extension}`),
+    generateRoutesBarrel(),
   );
 
   if (template === "web") {

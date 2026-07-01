@@ -1,6 +1,5 @@
 import { readFileSync, writeFileSync, existsSync } from "fs";
 import { join } from "path";
-import { Database } from "@/lib/types/index.js";
 
 export const updatePrismaSchema = async (
   workingDir: string,

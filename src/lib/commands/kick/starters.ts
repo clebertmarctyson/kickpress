@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, existsSync } from "fs";
+import { readFileSync, writeFileSync } from "fs";
 import { join } from "path";
 import { select } from "@inquirer/prompts";
 
@@ -6,7 +6,7 @@ import { generateModel } from "@/lib/commands/make/generators/model.js";
 import { generateService } from "@/lib/commands/make/generators/service.js";
 import { generateController } from "@/lib/commands/make/generators/controller.js";
 import { generateValidations } from "@/lib/commands/make/generators/validation.js";
-import { generateRoutes } from "@/lib/commands/make/generators/routes.js";
+import { generateModule } from "@/lib/commands/make/generators/module.js";
 import { generateHttpRequests } from "@/lib/commands/make/generators/http.js";
 import { injectRouteIntoIndex } from "@/lib/commands/make/injectors/index-injector.js";
 import type { ProjectConfig as MakeProjectConfig } from "@/lib/commands/make/detect.js";
@@ -65,7 +65,7 @@ export const applyTodoStarter = async (
   await generateService(projectPath, "todo", "Todo", makeConfig);
   await generateController(projectPath, "todo", "Todo", "todos", makeConfig);
   await generateValidations(projectPath, "todo", makeConfig);
-  await generateRoutes(projectPath, "todo", makeConfig);
+  await generateModule(projectPath, "todo", "Todo", makeConfig);
   await injectRouteIntoIndex(projectPath, "todo", "/todos", makeConfig);
   await generateHttpRequests(projectPath, "todo", "todos", "/todos");
 
@@ -94,12 +94,12 @@ model Todo {
   writeFileSync(schemaPath, schema + todoModel);
 
   // Override validation with pre-filled Todo schemas
-  const validationPath = join(projectPath, "src", "validations", `todo.validation.${ext}`);
+  const validationPath = join(projectPath, "src", "todo", `todo.validation.${ext}`);
   writeFileSync(validationPath, todoValidation(typescript, database === Database.MongoDB));
 
   // Override types with Todo-specific fields (TS only)
   if (typescript) {
-    const typesPath = join(projectPath, "src", "types", "todo.d.ts");
+    const typesPath = join(projectPath, "src", "todo", "todo.types.ts");
     writeFileSync(typesPath, todoTypes(database === Database.MongoDB));
   }
 
@@ -307,13 +307,13 @@ const render = (todos) => {
 };
 
 const load = async () => {
-  const res = await fetch("/todos");
+  const res = await fetch("/api/todos");
   render(await res.json());
 };
 
 form.onsubmit = async (e) => {
   e.preventDefault();
-  await fetch("/todos", {
+  await fetch("/api/todos", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ title: input.value }),
@@ -323,7 +323,7 @@ form.onsubmit = async (e) => {
 };
 
 const toggle = async (id, completed) => {
-  await fetch(\`/todos/\${id}\`, {
+  await fetch(\`/api/todos/\${id}\`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ completed }),
@@ -332,7 +332,7 @@ const toggle = async (id, completed) => {
 };
 
 const remove = async (id) => {
-  await fetch(\`/todos/\${id}\`, { method: "DELETE" });
+  await fetch(\`/api/todos/\${id}\`, { method: "DELETE" });
   load();
 };
 

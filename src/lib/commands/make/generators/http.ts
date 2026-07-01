@@ -20,7 +20,7 @@ export const generateHttpRequests = async (
     entity.charAt(0).toUpperCase() + entity.slice(1)
   } API Requests
 
-@baseUrl = http://localhost:3000
+@baseUrl = http://localhost:3000/api
 @contentType = application/json
 
 ### Get all ${tableName}

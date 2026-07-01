@@ -4,7 +4,7 @@ import chalk from "chalk";
 import { input } from "@inquirer/prompts";
 import { getWorkingDirectory } from "@/lib/utils/paths.js";
 import { detectProjectConfig } from "@/lib/commands/make/detect.js";
-import { generateRoutes } from "@/lib/commands/make/generators/routes.js";
+import { generateModule } from "@/lib/commands/make/generators/module.js";
 import { generateController } from "@/lib/commands/make/generators/controller.js";
 import { generateValidations } from "./generators/validation.js";
 import { generateModel } from "@/lib/commands/make/generators/model.js";
@@ -20,10 +20,9 @@ export const registerInventCommand = (program: Command): void => {
     .command("make <entity>")
     .aliases(["mk"])
     .description("Generate all CRUD resources for an entity")
-    .option("-f, --force", "Overwrite existing files")
     .option("--table <table>", "Table name (plural form), skips prompt")
     .option("--route <route>", "Route path (e.g. /todos), skips prompt")
-    .action(async (entity: string, opts: { force?: boolean; table?: string; route?: string }) => {
+    .action(async (entity: string, opts: { table?: string; route?: string }) => {
       try {
         const workingDir = getWorkingDirectory();
 
@@ -71,8 +70,10 @@ export const registerInventCommand = (program: Command): void => {
           projectConfig
         );
 
-        console.log(chalk.gray("📝 Updating Prisma schema..."));
-        await updatePrismaSchema(workingDir, entityCapitalized);
+        if (projectConfig.hasDatabase) {
+          console.log(chalk.gray("📝 Updating Prisma schema..."));
+          await updatePrismaSchema(workingDir, entityCapitalized);
+        }
 
         console.log(chalk.gray("📝 Creating types..."));
         await generateTypes(
@@ -102,10 +103,10 @@ export const registerInventCommand = (program: Command): void => {
         console.log(chalk.gray("📝 Creating validations..."));
         await generateValidations(workingDir, entity, projectConfig);
 
-        console.log(chalk.gray("📝 Creating routes..."));
-        await generateRoutes(workingDir, entity, projectConfig);
+        console.log(chalk.gray("📝 Creating module..."));
+        await generateModule(workingDir, entity, entityCapitalized, projectConfig);
 
-        console.log(chalk.gray("📝 Updating index file..."));
+        console.log(chalk.gray("📝 Updating routes barrel..."));
         await injectRouteIntoIndex(
           workingDir,
           entity,

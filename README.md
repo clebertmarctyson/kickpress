@@ -258,15 +258,15 @@ npx kickpress mk   post --table posts --route /posts
 | File                              | Description                                     |
 | --------------------------------- | ----------------------------------------------- |
 | `prisma/schema.prisma`            | Updated with new model stub                     |
-| `types/entity.d.ts`               | TypeScript interfaces (TS only)                 |
-| `models/entity.model.*`           | Raw Prisma database operations                  |
-| `services/entity.service.*`       | Business logic wrapping the model               |
-| `controllers/entity.controller.*` | HTTP handlers calling the service               |
-| `validations/entity.validation.*` | Zod schemas and validation middleware           |
-| `routes/entity.routes.*`          | Express routes wired to controller + validation |
+| `entity/entity.types.ts`          | TypeScript interfaces (TS only)                 |
+| `entity/entity.model.*`           | Raw Prisma database operations                  |
+| `entity/entity.service.*`         | Business logic wrapping the model               |
+| `entity/entity.controller.*`      | HTTP handlers (class, constructor DI)           |
+| `entity/entity.validation.*`      | Zod schemas and validation middleware           |
+| `entity/entity.module.*`          | Wires model → service → controller, owns router |
 | `requests/entity.http`            | HTTP test file for all endpoints                |
 
-Routes are also **auto-injected** into `src/index.*`.
+Routes are also **auto-injected** into `src/routes/index.*`.
 
 **Architecture flow:**
 
@@ -562,79 +562,111 @@ npx kickpress switch db sqlite
 ```
 my-api/
 ├── src/
-│   ├── index.ts                    # Main entry point
-│   ├── lib/
-│   │   └── prisma.ts               # Prisma client
-│   ├── controllers/
-│   ├── models/
-│   ├── services/
+│   ├── index.ts                    # App entry (sealed — never touched by make)
 │   ├── routes/
-│   ├── validations/
-│   ├── types/
+│   │   └── index.ts               # Route barrel (auto-updated by make)
+│   ├── lib/
+│   │   └── prisma.ts              # Prisma client
 │   ├── middlewares/
 │   │   └── error.middleware.ts
-│   ├── config/
 │   └── utils/
 ├── prisma/
-│   ├── schema.prisma
-│   └── migrations/
+│   └── schema.prisma
 ├── requests/
 ├── .env
 ├── tsconfig.json
 └── package.json
 ```
 
+After `kickpress make user`, each entity gets its own module folder:
+
+```
+src/
+└── user/
+    ├── user.model.ts              # Prisma operations
+    ├── user.service.ts            # Business logic
+    ├── user.controller.ts         # HTTP handlers
+    ├── user.module.ts             # Wires graph + owns the router
+    ├── user.types.ts              # TypeScript interfaces
+    └── user.validation.ts         # Zod schemas + middleware
+```
+
 ## 🎨 Generated Code Examples
 
-### Model (`src/models/user.model.ts`)
+### Model (`src/user/user.model.ts`)
 
 ```typescript
 import prisma from "../lib/prisma";
-import type { User, UserCreateInput, UserUpdateInput } from "../types/user";
+import type { User, UserCreateInput, UserUpdateInput } from "./user.types";
 
-const userFindAll = async (): Promise<User[]> => prisma.user.findMany();
-const userFindOne = async (id: number): Promise<User | null> => prisma.user.findUnique({ where: { id } });
-const userCreate = async (data: UserCreateInput): Promise<User> => prisma.user.create({ data });
-const userUpdate = async (id: number, data: UserUpdateInput): Promise<User | null> => prisma.user.update({ where: { id }, data });
-const userDelete = async (id: number): Promise<User | null> => prisma.user.delete({ where: { id } });
-
-export { userFindAll, userFindOne, userCreate, userUpdate, userDelete };
+export class UserModel {
+  async findAll(): Promise<User[]> { return prisma.user.findMany(); }
+  async findOne(id: number): Promise<User | null> { return prisma.user.findUnique({ where: { id } }); }
+  async create(data: UserCreateInput): Promise<User> { return prisma.user.create({ data }); }
+  async update(id: number, data: UserUpdateInput): Promise<User | null> { return prisma.user.update({ where: { id }, data }); }
+  async delete(id: number): Promise<User | null> { return prisma.user.delete({ where: { id } }); }
+}
 ```
 
-### Controller (`src/controllers/user.controller.ts`)
+### Controller (`src/user/user.controller.ts`)
 
 ```typescript
 import { Request, Response } from "express";
 import asyncHandler from "express-async-handler";
-import { getAllUsers, getUser, createUser, updateUser, deleteUser } from "../services/user.service";
+import { UserService } from "./user.service";
 
-const all = asyncHandler(async (_: Request, res: Response) => {
-  res.json(await getAllUsers());
-});
-const findOne = asyncHandler(async (req: Request, res: Response) => {
-  const user = await getUser(Number(req.params.id));
-  if (!user) { res.status(404); throw new Error("User not found"); }
-  res.json(user);
-});
-const create = asyncHandler(async (req: Request, res: Response) => {
-  res.status(201).json(await createUser(req.body));
-});
-const update = asyncHandler(async (req: Request, res: Response) => {
-  const user = await getUser(Number(req.params.id));
-  if (!user) { res.status(404); throw new Error("User not found"); }
-  res.json(await updateUser(user.id, req.body));
-});
-const remove = asyncHandler(async (req: Request, res: Response) => {
-  const user = await getUser(Number(req.params.id));
-  if (!user) { res.status(404); throw new Error("User not found"); }
-  await deleteUser(user.id);
-  res.status(204).send();
-});
+export class UserController {
+  constructor(private service: UserService) {}
 
-export { all, findOne, create, update, remove };
+  all = asyncHandler(async (_: Request, res: Response) => {
+    res.json(await this.service.getAll());
+  });
+  findOne = asyncHandler(async (req: Request, res: Response) => {
+    const user = await this.service.getOne(Number(req.params.id));
+    if (!user) { res.status(404); throw new Error("User not found"); }
+    res.json(user);
+  });
+  create = asyncHandler(async (req: Request, res: Response) => {
+    res.status(201).json(await this.service.create(req.body));
+  });
+  update = asyncHandler(async (req: Request, res: Response) => {
+    const user = await this.service.getOne(Number(req.params.id));
+    if (!user) { res.status(404); throw new Error("User not found"); }
+    res.json(await this.service.update(user.id, req.body));
+  });
+  remove = asyncHandler(async (req: Request, res: Response) => {
+    const user = await this.service.getOne(Number(req.params.id));
+    if (!user) { res.status(404); throw new Error("User not found"); }
+    await this.service.delete(user.id);
+    res.status(204).send();
+  });
+}
 ```
 
-### Validation (`src/validations/user.validation.ts`)
+### Module (`src/user/user.module.ts`)
+
+```typescript
+import { Router } from "express";
+import { UserModel } from "./user.model";
+import { UserService } from "./user.service";
+import { UserController } from "./user.controller";
+import { validateUserCreate, validateUserUpdate, validateUserId } from "./user.validation";
+
+const model = new UserModel();
+const service = new UserService(model);
+const controller = new UserController(service);
+
+const router = Router();
+router.route("/").get(controller.all).post(validateUserCreate, controller.create);
+router.route("/:id")
+  .get(validateUserId, controller.findOne)
+  .patch(validateUserId, validateUserUpdate, controller.update)
+  .delete(validateUserId, controller.remove);
+
+export default router;
+```
+
+### Validation (`src/user/user.validation.ts`)
 
 Standard (fill in your fields after extending the Prisma model):
 
@@ -796,8 +828,8 @@ Each generated resource includes an `.http` file. Use the [REST Client](https://
 Or use curl:
 
 ```bash
-curl http://localhost:3000/users
-curl -X POST http://localhost:3000/users \
+curl http://localhost:3000/api/users
+curl -X POST http://localhost:3000/api/users \
   -H "Content-Type: application/json" \
   -d '{"name":"John Doe","email":"john@example.com"}'
 ```

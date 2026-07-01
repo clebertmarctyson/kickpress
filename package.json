@@ -1,6 +1,6 @@
 {
   "name": "kickpress",
-  "version": "1.0.9",
+  "version": "1.0.10",
   "description": "A fast and opinionated CLI for scaffolding Express.js projects with TypeScript, Prisma, and best practices built-in",
   "main": "dist/index.js",
   "type": "module",
@@ -9,7 +9,7 @@
     "README.md"
   ],
   "bin": {
-    "kickpress": "./dist/index.js"
+    "kickpress": "dist/index.js"
   },
   "scripts": {
     "build": "tsc && tsc-alias",

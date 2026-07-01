@@ -9,19 +9,19 @@ export const generateModel = async (
   entityCapitalized: string,
   config: ProjectConfig
 ): Promise<void> => {
-  const modelsDir = join(workingDir, config.srcDir, "models");
+  const entityDir = join(workingDir, config.srcDir, entity);
 
-  if (!existsSync(modelsDir)) {
-    mkdirSync(modelsDir, { recursive: true });
+  if (!existsSync(entityDir)) {
+    mkdirSync(entityDir, { recursive: true });
   }
 
-  const modelFile = join(modelsDir, `${entity}.model.${config.fileExtension}`);
+  const modelFile = join(entityDir, `${entity}.model.${config.fileExtension}`);
 
   const isMongo = config.database === Database.MongoDB;
 
   const content = config.typescript
     ? generateTypeScriptModel(entity, entityCapitalized, isMongo)
-    : generateJavaScriptModel(entity, isMongo);
+    : generateJavaScriptModel(entity, entityCapitalized, isMongo);
 
   writeFileSync(modelFile, content);
 };
@@ -38,88 +38,73 @@ import type {
   ${entityCapitalized},
   ${entityCapitalized}CreateInput,
   ${entityCapitalized}UpdateInput,
-} from "../types/${entity}";
+} from "./${entity}.types";
 
-const ${entity}FindAll = async (): Promise<${entityCapitalized}[]> => {
-  return prisma.${entity}.findMany();
-};
+export class ${entityCapitalized}Model {
+  async findAll(): Promise<${entityCapitalized}[]> {
+    return prisma.${entity}.findMany();
+  }
 
-const ${entity}FindOne = async (id: ${idType}): Promise<${entityCapitalized} | null> => {
-  return prisma.${entity}.findUnique({
-    where: { id },
-  });
-};
+  async findOne(id: ${idType}): Promise<${entityCapitalized} | null> {
+    return prisma.${entity}.findUnique({
+      where: { id },
+    });
+  }
 
-const ${entity}Create = async (data: ${entityCapitalized}CreateInput): Promise<${entityCapitalized}> => {
-  return prisma.${entity}.create({
-    data,
-  });
-};
+  async create(data: ${entityCapitalized}CreateInput): Promise<${entityCapitalized}> {
+    return prisma.${entity}.create({
+      data,
+    });
+  }
 
-const ${entity}Update = async (
-  id: ${idType},
-  data: ${entityCapitalized}UpdateInput
-): Promise<${entityCapitalized} | null> => {
-  return prisma.${entity}.update({
-    where: { id },
-    data,
-  });
-};
+  async update(id: ${idType}, data: ${entityCapitalized}UpdateInput): Promise<${entityCapitalized} | null> {
+    return prisma.${entity}.update({
+      where: { id },
+      data,
+    });
+  }
 
-const ${entity}Delete = async (id: ${idType}): Promise<${entityCapitalized} | null> => {
-  return prisma.${entity}.delete({
-    where: { id },
-  });
-};
-
-export {
-  ${entity}FindAll,
-  ${entity}FindOne,
-  ${entity}Create,
-  ${entity}Update,
-  ${entity}Delete,
-};
+  async delete(id: ${idType}): Promise<${entityCapitalized} | null> {
+    return prisma.${entity}.delete({
+      where: { id },
+    });
+  }
+}
 `;
 };
 
-const generateJavaScriptModel = (entity: string, _isMongo: boolean): string => {
+const generateJavaScriptModel = (entity: string, entityCapitalized: string, _isMongo: boolean): string => {
   return `import prisma from "../lib/prisma.js";
 
-const ${entity}FindAll = async () => {
-  return prisma.${entity}.findMany();
-};
+export class ${entityCapitalized}Model {
+  async findAll() {
+    return prisma.${entity}.findMany();
+  }
 
-const ${entity}FindOne = async (id) => {
-  return prisma.${entity}.findUnique({
-    where: { id },
-  });
-};
+  async findOne(id) {
+    return prisma.${entity}.findUnique({
+      where: { id },
+    });
+  }
 
-const ${entity}Create = async (data) => {
-  return prisma.${entity}.create({
-    data,
-  });
-};
+  async create(data) {
+    return prisma.${entity}.create({
+      data,
+    });
+  }
 
-const ${entity}Update = async (id, data) => {
-  return prisma.${entity}.update({
-    where: { id },
-    data,
-  });
-};
+  async update(id, data) {
+    return prisma.${entity}.update({
+      where: { id },
+      data,
+    });
+  }
 
-const ${entity}Delete = async (id) => {
-  return prisma.${entity}.delete({
-    where: { id },
-  });
-};
-
-export {
-  ${entity}FindAll,
-  ${entity}FindOne,
-  ${entity}Create,
-  ${entity}Update,
-  ${entity}Delete,
-};
+  async delete(id) {
+    return prisma.${entity}.delete({
+      where: { id },
+    });
+  }
+}
 `;
 };
