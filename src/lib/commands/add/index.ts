@@ -12,6 +12,7 @@ import {
   generatePrismaConfig,
   generatePrismaClient,
   generateErrorMiddleware,
+  ensurePnpmAllowBuilds,
 } from "@/lib/commands/kick/generators.js";
 import { Database } from "@/lib/types/index.js";
 
@@ -104,6 +105,12 @@ export const registerAddCommand = (program: Command): void => {
           corePkgs.push("@prisma/adapter-mariadb");
         }
 
+        if (pm === "pnpm") {
+          const buildPackages = ["prisma", "@prisma/engines"];
+          if (db === Database.SQLite) buildPackages.push("better-sqlite3");
+          ensurePnpmAllowBuilds(workingDir, buildPackages);
+        }
+
         execSync(installProd(corePkgs.join(" ")), { cwd: workingDir, stdio: "inherit" });
         execSync(installDev(db === Database.MongoDB ? `prisma@${prismaVersion}` : "prisma"), { cwd: workingDir, stdio: "inherit" });
 
@@ -120,26 +127,6 @@ export const registerAddCommand = (program: Command): void => {
 
         // 3. Create prisma.config.ts
         writeFileSync(join(workingDir, "prisma.config.ts"), generatePrismaConfig(db));
-
-        // 4. Create src/lib/prisma client file
-        console.log(chalk.gray("📝 Creating Prisma client..."));
-        const libDir = join(workingDir, "src", "lib");
-        mkdirSync(libDir, { recursive: true });
-
-        writeFileSync(join(libDir, `prisma.${ext}`), generatePrismaClient(typescript, db));
-
-        // 5. Patch error middleware to handle Prisma errors
-        console.log(chalk.gray("📝 Updating error middleware..."));
-        const middlewarePath = join(
-          workingDir,
-          "src",
-          "middlewares",
-          `error.middleware.${ext}`
-        );
-
-        if (existsSync(middlewarePath)) {
-          writeFileSync(middlewarePath, generateErrorMiddleware(typescript, true, db));
-        }
 
         // 6. Append DATABASE_URL to .env
         console.log(chalk.gray("📝 Updating .env..."));
@@ -190,20 +177,31 @@ export const registerAddCommand = (program: Command): void => {
         console.log(chalk.blue("\n📦 Running Prisma generate...\n"));
         execSync(run("db:generate"), { cwd: workingDir, stdio: "inherit" });
 
+        // 10. Only now that the generated client actually exists, create src/lib/prisma
+        // and patch the error middleware — writing them earlier would import a client
+        // that isn't there yet
+        console.log(chalk.gray("📝 Creating Prisma client..."));
+        const libDir = join(workingDir, "src", "lib");
+        mkdirSync(libDir, { recursive: true });
+        writeFileSync(join(libDir, `prisma.${ext}`), generatePrismaClient(typescript, db));
+
+        console.log(chalk.gray("📝 Updating error middleware..."));
+        const middlewarePath = join(
+          workingDir,
+          "src",
+          "middlewares",
+          `error.middleware.${ext}`
+        );
+        if (existsSync(middlewarePath)) {
+          writeFileSync(middlewarePath, generateErrorMiddleware(typescript, true, db));
+        }
+
         if (db === Database.SQLite || db === Database.MongoDB) {
           console.log(chalk.blue("\n📦 Running Prisma push...\n"));
           execSync(run("db:push"), { cwd: workingDir, stdio: "inherit" });
           console.log(chalk.green("\n✅ Database added successfully!\n"));
         } else {
           console.log(chalk.green("\n✅ Prisma client generated!\n"));
-        }
-
-        if (pm === "pnpm" && db === Database.SQLite) {
-          console.log(
-            chalk.yellow(
-              "⚠️  If you see native build errors, run: pnpm approve-builds (select better-sqlite3)\n"
-            )
-          );
         }
 
         console.log(chalk.cyan("Next steps:"));

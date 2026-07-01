@@ -1,8 +1,41 @@
-import { writeFileSync, mkdirSync } from "fs";
+import { writeFileSync, mkdirSync, existsSync, readFileSync } from "fs";
 
 import { Database, ProjectConfig } from "@/lib/types/index.js";
 
 import { join } from "path";
+
+// pnpm blocks postinstall/build scripts by default; without this, `pnpm install`
+// exits non-zero for these packages and aborts before `prisma generate` ever runs,
+// leaving the generated Prisma client import unresolved.
+export const ensurePnpmAllowBuilds = (
+  workingDir: string,
+  packages: string[],
+): void => {
+  if (packages.length === 0) {
+    return;
+  }
+
+  const workspacePath = join(workingDir, "pnpm-workspace.yaml");
+  const existing = existsSync(workspacePath)
+    ? readFileSync(workspacePath, "utf-8")
+    : "";
+
+  const missing = packages.filter((pkg) => !existing.includes(pkg));
+
+  if (missing.length === 0) {
+    return;
+  }
+
+  const newLines = missing.map(
+    (pkg) => `  ${pkg.includes("/") ? `"${pkg}"` : pkg}: true`
+  );
+
+  const updated = existing.includes("allowBuilds:")
+    ? existing.trimEnd() + "\n" + newLines.join("\n") + "\n"
+    : existing + (existing ? "\n" : "") + "allowBuilds:\n" + newLines.join("\n") + "\n";
+
+  writeFileSync(workspacePath, updated);
+};
 
 export const createProjectStructure = (
   projectPath: string,
@@ -819,24 +852,7 @@ A production-ready Express.js API with TypeScript, Prisma ORM, and best practice
 
 ## 🚀 Getting Started
 
-${
-  pm === "pnpm" && database === "sqlite"
-    ? `### ⚠️ Important: Approve Native Builds (pnpm only)
-
-Before running the project, you need to approve native dependencies:
-
-\`\`\`bash
-pnpm approve-builds
-# Select: better-sqlite3 (press space, then enter)
-\`\`\`
-
-This is a one-time setup required by pnpm for native dependencies.
-
----
-
-`
-    : ""
-}### 1. Install Dependencies
+### 1. Install Dependencies
 
 ${
   pm === "pnpm"
@@ -1020,18 +1036,7 @@ Make sure:
 4. For local dev: \`mongod --replSet rs0\`
 `
     : ""
-}${
-    pm === "pnpm" && database === "sqlite"
-      ? `
-### Module not found errors (pnpm)
-Make sure you've approved native builds:
-\`\`\`bash
-pnpm approve-builds
-# Select: better-sqlite3
-\`\`\`
-`
-      : ""
-  }
+}
 ## 💬 Support
 
 - 🐛 [Report Issues](https://github.com/clebertmarctyson/kickpress/issues)
@@ -1071,6 +1076,15 @@ export const writeProjectFiles = (
     join(projectPath, "README.md"),
     generateReadme(projectName, typescript, packageManager, database, template),
   );
+
+  if (packageManager === "pnpm") {
+    const buildPackages: string[] = [];
+    if (typescript) buildPackages.push("esbuild");
+    if (database !== Database.None) buildPackages.push("prisma", "@prisma/engines");
+    if (database === Database.SQLite) buildPackages.push("better-sqlite3");
+
+    ensurePnpmAllowBuilds(projectPath, buildPackages);
+  }
 
   // ── NPM PACKAGE ──────────────────────────────────────────────────────────
   if (template === "npm") {
@@ -1133,7 +1147,8 @@ program.parse();
     writeFileSync(join(projectPath, ".env"), generateEnvFile(dbUrl));
     writeFileSync(join(projectPath, "prisma.config.ts"), generatePrismaConfig(database));
     writeFileSync(join(projectPath, "prisma", "schema.prisma"), generatePrismaSchema(database));
-    writeFileSync(join(projectPath, "src", "lib", `prisma.${extension}`), generatePrismaClient(typescript, database));
+    // src/lib/prisma.* is written later, via writePostGenerateFiles, once `prisma
+    // generate` has actually produced the client it imports from.
     return;
   }
 
@@ -1144,7 +1159,9 @@ program.parse();
   );
   writeFileSync(
     join(projectPath, "src", "middlewares", `error.middleware.${extension}`),
-    generateErrorMiddleware(typescript, database !== Database.None, database),
+    // Written plain (no Prisma-aware error handling) here — writePostGenerateFiles
+    // upgrades it once `prisma generate` has actually run.
+    generateErrorMiddleware(typescript, false),
   );
   writeFileSync(
     join(projectPath, "src", "routes", `index.${extension}`),
@@ -1194,10 +1211,8 @@ h1 { margin-bottom: 1rem; }
       join(projectPath, "prisma", "schema.prisma"),
       generatePrismaSchema(database),
     );
-    writeFileSync(
-      join(projectPath, "src", "lib", `prisma.${extension}`),
-      generatePrismaClient(typescript, database),
-    );
+    // src/lib/prisma.* is written later, via writePostGenerateFiles, once `prisma
+    // generate` has actually produced the client it imports from.
 
     const dbUrl =
       database === Database.SQLite
@@ -1215,6 +1230,31 @@ h1 { margin-bottom: 1rem; }
     writeFileSync(
       join(projectPath, ".env"),
       `PORT=3000\nNODE_ENV=development\n`,
+    );
+  }
+};
+
+// Writes the files that import from the generated Prisma client. Must only be
+// called after `prisma generate` has actually succeeded — calling it earlier
+// (as writeProjectFiles used to) leaves an import pointing at a directory that
+// doesn't exist yet.
+export const writePostGenerateFiles = (
+  projectPath: string,
+  typescript: boolean,
+  database: Database,
+  template: string,
+): void => {
+  const extension = typescript ? "ts" : "js";
+
+  writeFileSync(
+    join(projectPath, "src", "lib", `prisma.${extension}`),
+    generatePrismaClient(typescript, database),
+  );
+
+  if (template === "api" || template === "web") {
+    writeFileSync(
+      join(projectPath, "src", "middlewares", `error.middleware.${extension}`),
+      generateErrorMiddleware(typescript, true, database),
     );
   }
 };

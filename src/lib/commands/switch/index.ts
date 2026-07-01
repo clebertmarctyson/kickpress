@@ -6,7 +6,7 @@ import { select } from "@inquirer/prompts";
 import chalk from "chalk";
 
 import { getWorkingDirectory } from "@/lib/utils/paths.js";
-import { generatePrismaClient } from "@/lib/commands/kick/generators.js";
+import { generatePrismaClient, ensurePnpmAllowBuilds } from "@/lib/commands/kick/generators.js";
 import { Database } from "@/lib/types/index.js";
 
 const detectCurrentDatabase = (workingDir: string): Database | null => {
@@ -143,6 +143,12 @@ export const registerSwitchCommand = (program: Command): void => {
         const run = (cmd: string) =>
           packageManager === "npm" ? `npm run ${cmd}` : `${packageManager} ${cmd}`;
 
+        if (packageManager === "pnpm") {
+          const buildPackages = ["prisma", "@prisma/engines"];
+          if (targetDb === Database.SQLite) buildPackages.push("better-sqlite3");
+          ensurePnpmAllowBuilds(workingDir, buildPackages);
+        }
+
         // 1. Swap packages
         console.log(chalk.gray("📦 Swapping database adapter packages..."));
         if (currentDb === Database.SQLite) {
@@ -203,28 +209,21 @@ export const registerSwitchCommand = (program: Command): void => {
           writeFileSync(envPath, env);
         }
 
-        // 4. Regenerate src/lib/prisma client file
+        // 4. Run db:generate against the updated schema
+        console.log(chalk.blue("\n📦 Running Prisma generate...\n"));
+        execSync(run("db:generate"), { cwd: workingDir, stdio: "inherit" });
+
+        // 5. Only now that the generated client actually exists, regenerate
+        // src/lib/prisma — writing it earlier would import a client that isn't there yet
         console.log(chalk.gray("📝 Regenerating Prisma client file..."));
         const prismaClientPath = join(workingDir, "src", "lib", `prisma.${fileExtension}`);
         writeFileSync(prismaClientPath, generatePrismaClient(typescript, targetDb));
-
-        // 5. Run db:generate
-        console.log(chalk.blue("\n📦 Running Prisma generate...\n"));
-        execSync(run("db:generate"), { cwd: workingDir, stdio: "inherit" });
 
         // 6. For SQLite: run db:push. For server DBs: skip (needs real connection string first)
         if (targetDb === Database.SQLite) {
           console.log(chalk.blue("\n📦 Running Prisma push...\n"));
           execSync(run("db:push"), { cwd: workingDir, stdio: "inherit" });
           console.log(chalk.green("\n✅ Switched to SQLite successfully!\n"));
-
-          if (packageManager === "pnpm") {
-            console.log(
-              chalk.yellow(
-                "⚠️  If you see native build errors, run: pnpm approve-builds (select better-sqlite3)\n"
-              )
-            );
-          }
         } else if (targetDb === Database.MySQL) {
           console.log(chalk.green("\n✅ Schema switched to MySQL!\n"));
           console.log(chalk.cyan("Next steps:"));

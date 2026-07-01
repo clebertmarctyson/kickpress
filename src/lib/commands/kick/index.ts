@@ -13,6 +13,7 @@ import {
 import {
   createProjectStructure,
   writeProjectFiles,
+  writePostGenerateFiles,
 } from "@/lib/commands/kick/generators.js";
 
 import { resolveProjectPath } from "@/lib/utils/paths.js";
@@ -158,6 +159,11 @@ export const registerFreshCommand = (program: Command): void => {
             cwd: projectPath,
             stdio: "inherit",
           });
+
+          // Only now that the generated client actually exists, write the files
+          // that import from it — writing them earlier risks a dangling import
+          // if install/generate had failed or been interrupted first.
+          writePostGenerateFiles(projectPath, useTypeScript, database, template);
 
           if (database === Database.SQLite || database === Database.MongoDB) {
             const pushCmd =

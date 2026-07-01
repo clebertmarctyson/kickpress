@@ -400,7 +400,6 @@ pnpm db:push
 npx kickpress init my-api
 # Select: REST API → Todo starter → TypeScript → SQLite → pnpm
 cd my-api
-pnpm approve-builds  # select better-sqlite3 (pnpm only)
 pnpm dev
 ```
 
@@ -425,8 +424,6 @@ curl -X POST http://localhost:3000/todos \
 npx kickpress init blog-api -t api -d sqlite
 cd blog-api
 ```
-
-> **pnpm users:** Run `pnpm approve-builds` and select `better-sqlite3` before starting.
 
 **2. Generate resources:**
 
@@ -522,7 +519,6 @@ pnpm dev
 # Create with database from the start
 npx kickpress init my-tool -t cli -d sqlite
 cd my-tool
-pnpm approve-builds  # select better-sqlite3 (pnpm only)
 pnpm dev
 
 # Or add a database to an existing CLI project
@@ -844,13 +840,6 @@ curl -X POST http://localhost:3000/api/users \
 ```
 
 ## 🐛 Troubleshooting
-
-### pnpm: "Cannot find module" errors (SQLite)
-
-```bash
-pnpm approve-builds
-# Select: better-sqlite3 (press space, then enter)
-```
 
 ### Prisma Client errors
 
